@@ -24,17 +24,30 @@ def response(message, history):
         yield full_response.getvalue()
     
 
+def add_data(text):
+    print(f"Data: {text}")
+    return "Data added successfully"
+
 def delete_user_files(req: gr.Request):
     pass
 
 
 
-iface = gr.ChatInterface(
+chat_ui = gr.ChatInterface(
     fn=response,
     type="messages",
     title="PaperLlama",
     multimodal=True,
     delete_cache=(3600, 1000),
 )
+
+data_add_ui = gr.Interface(
+    fn=add_data,
+    inputs=["text"],
+    outputs="text",
+)
+
+iface = gr.TabbedInterface([chat_ui, data_add_ui], tab_names=["Chat", "Add Data"])
+
 # iface.unload(delete_user_files)
 iface.launch(server_name="0.0.0.0", server_port=80)
