@@ -1,0 +1,52 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    # ports:
+    #   - "11434:11434"
+    # if gpu uncomment the following
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  webui:
+    build:
+      context: webui
+      dockerfile: Dockerfile_webui
+    container_name: webui
+    volumes:
+      - $PWD/webui:/dev_webui
+    ports:
+      - "80:80"
+    stdin_open: true
+    tty: true
+    command: 
+      - /bin/bash
+  
+  vector_index:
+    build:
+      context: vector_index
+      dockerfile: Dockerfile_vectorindex
+    container_name: vector_index
+    ports:
+      - "8080:8000"
+    volumes:
+      - $PWD/vector_index:/dev_vector_index
+      - database_data:/vector_index/data
+    environment:
+      - EMBEDDING_MODEL_NAME=nomic-embed-text
+    stdin_open: true
+    tty: true
+    command: 
+      - /bin/bash
+
+volumes:
+  database_data:
+  ollama_data:
+
