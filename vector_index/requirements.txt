@@ -1,0 +1,4 @@
+fastapi[standard]==0.115.4
+faiss-cpu==1.9.0
+ollama==0.3.3
+pypdf2==3.0.1
