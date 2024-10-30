@@ -1,1 +1,1 @@
-from .manager import StorageManager
+from .datastore import DataStore
