@@ -1,7 +1,7 @@
 import io
 from dataclasses import dataclass
 
-import PyPDF2 
+from PyPDF2 import PdfReader 
 
 
 @dataclass
@@ -23,8 +23,8 @@ def convert(pdf_file: str | bytes) -> str:
     if not isinstance(pdf_file, bytes):
         return "Not implemented"
     
-
-    pdf = PyPDF2.PdfFileReader(pdf_file)
+    file_stream = io.BytesIO(pdf_file)
+    pdf = PdfReader(file_stream)
     # pages = []
 
     content = io.StringIO()
