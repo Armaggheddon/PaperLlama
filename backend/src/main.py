@@ -13,10 +13,11 @@ async def lifespan(app: FastAPI):
     
     # app.state.ollama_embed = await OllamaEmbed.create("ollama", 11434)
     app.state.ollama_proxy = await OllamaProxy.create("ollama", 11434)
-    app.state.datastore = DataStore(768)
+    app.state.datastore = DataStore(app.state.ollama_proxy.embed_model_output)
     yield
 
     # Stop the app
+    app.state.datastore.close()
 
 
 app = FastAPI(
@@ -46,6 +47,10 @@ async def add_document(document: UploadFile):
     print(f"Received document: {document.filename} of size {len(document_bytes)}")
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
     datastore: DataStore = app.state.datastore
+
+    if datastore.has_document(document_bytes):
+        return {"status": "Document already exists in the datastore"}
+
     text_chunks = to_chunks(document_bytes, 512, 128)
     print(f"Document has been parsed in {len(text_chunks)} chunks")
     embeddings = await ollama_proxy.embed(text_chunks)

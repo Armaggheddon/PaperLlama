@@ -29,16 +29,16 @@ services:
     command: 
       - /bin/bash
   
-  vector_index:
+  backend:
     build:
-      context: vector_index
-      dockerfile: Dockerfile_vectorindex
-    container_name: vector_index
+      context: backend
+      dockerfile: Dockerfile_backend
+    container_name: backend
     ports:
       - "8080:8000"
     volumes:
-      - $PWD/vector_index:/dev_vector_index
-      - database_data:/vector_index/data
+      - $PWD/backend:/dev_backend
+      - database_data:/vector_index
     environment:
       - EMBEDDING_MODEL_NAME=nomic-embed-text
     stdin_open: true
