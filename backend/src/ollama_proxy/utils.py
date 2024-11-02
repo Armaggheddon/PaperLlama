@@ -18,12 +18,9 @@ def get_chat_model_name():
 def get_chat_model_max_input_tokens():
     return int(os.getenv("CHAT_MODEL_MAX_INPUT_TOKENS", 8192))
 
-def format_message(context: list[str], user_input: str) -> str:
+def format_summary_prompt(context: list[str]) -> str:
     _context = "\n\n".join(context)
-    return (
-        f"{prompts.BEGIN_CONTEXT_TOKEN} {_context} {prompts.END_CONTEXT_TOKEN} "
-        f"{prompts.BEGIN_USER_INPUT_TOKEN} {user_input} {prompts.END_USER_INPUT_TOKEN}"
-    )
+    return prompts.SUMMARIZE_PROMPT_TEMPLATE.format(context_str=_context)
 
 def format_query(context: list[str], user_input: str) -> str:
     _context = "\n\n".join(context)
