@@ -1,27 +1,46 @@
 import io
+import httpx
+import requests
+import json
 
 import gradio as gr
-from ollama import Client
 
-client = Client(host="http://ollama:11434")
-print(client.list())
-if "llama3.2:1b" not in client.list():
-    client.pull("llama3.2:1b")
+headers = {}
+headers["Content-Type"] = "application/json"
+headers["Accept"] = "application/json"
+backend_client = httpx.Client(
+    base_url="http://backend:8000",
+    follow_redirects=True,
+    timeout=None,
+    headers=headers
+)
+
+def streaming_response(message):
+    def inner():
+        with httpx.stream("GET", "http://backend:8000/query", params={"text": message}) as r:
+            try:
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                e.response.read()
+                raise RuntimeError(e.response.text, e.response.status_code) from None
+
+            for line in r.iter_lines():
+                partial = json.loads(line)
+                if e := partial.get('error'):
+                    raise RuntimeError(e)
+                yield partial
+    
+    return inner()
 
 def response(message, history):
-    print(f"Message: {message}")
-    print(f"History: {history}")
-    _history = [{"role": item["role"], "content": item["content"]} for item in history]
-    stream = client.chat(
-        model="llama3.2:1b",
-        messages=[*_history, {"role": "user", "content": message["text"]}],
-        stream=True,
-    ) 
-    full_response = io.StringIO()
-    for chunk in stream:
+    # _history = [{"role": item["role"], "content": item["content"]} for item in history]
+    stream = requests.get("http://backend:8000/query", params={"text": message["text"]}, stream=True)
+    running_response = io.StringIO()
+    for chunk in stream.iter_lines():
         print(chunk)
-        full_response.write(chunk["message"]["content"])
-        yield full_response.getvalue()
+        json_chunk = json.loads(chunk)
+        running_response.write(json_chunk["message"]["content"])
+        yield running_response.getvalue()
     
 
 def add_data(text):
