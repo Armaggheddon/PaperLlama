@@ -59,8 +59,11 @@ class VectorDB:
         if isinstance(ids, int):
             ids = [ids]
         np_ids = utils.list_to_numpy(ids)
-        ids_to_remove = faiss.IDSelectorBatch(len(ids), np_ids)
+        ids_to_remove = faiss.IDSelectorBatch(len(ids), faiss.swig_ptr(np_ids))
         self.root_index.remove_ids(ids_to_remove)
+
+    def clear_root(self):
+        self.root_index.reset()
 
     def add(self, index_name: str, vectors: list[list[float]], ovwerwrite: bool=False) -> list[int]:
         index_path = pathlib.Path(self.sub_index_path) / f"{index_name}.{_INDEX_EXTENSION}"
@@ -71,7 +74,7 @@ class VectorDB:
         faiss.write_index(tmp_index, str(index_path))
         return [i for i in range(0, len(vectors))]
 
-    def remove(self, index_name: str):
+    def delete(self, index_name: str):
         index_path = pathlib.Path(self.sub_index_path) / f"{index_name}.{_INDEX_EXTENSION}"
         if os.path.isfile(index_path):
             os.remove(index_path)
