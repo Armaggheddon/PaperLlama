@@ -21,8 +21,17 @@ services:
     ports:
       - "80:80"
   
-  # database:
-  #   image: todo
+  backend:
+    build:
+      context: backend
+      dockerfile: Dockerfile_backend
+    container_name: backend
+    ports:
+      - "8080:8000"
+    environment:
+      - EMBEDDING_MODEL_NAME=nomic-embed-text
+      - EMBEDDING_VECTOR_SIZE=768
+      # - INSTRUCT_MODEL_NAME=llama3.2:1b-instruct
 
 volumes:
   database_data:

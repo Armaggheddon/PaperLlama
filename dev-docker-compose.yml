@@ -14,20 +14,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-
-  webui:
-    build:
-      context: webui
-      dockerfile: Dockerfile_webui
-    container_name: webui
-    volumes:
-      - $PWD/webui:/dev_webui
-    ports:
-      - "80:80"
-    stdin_open: true
-    tty: true
-    command: 
-      - /bin/bash
   
   backend:
     build:
@@ -41,6 +27,22 @@ services:
       - database_data:/vector_index
     environment:
       - EMBEDDING_MODEL_NAME=nomic-embed-text
+      - EMBEDDING_VECTOR_SIZE=768
+      # - INSTRUCT_MODEL_NAME=llama3.2:1b-instruct
+    stdin_open: true
+    tty: true
+    command: 
+      - /bin/bash
+
+  webui:
+    build: 
+      context: webui
+      dockerfile: Dockerfile_webui
+    container_name: webui
+    volumes:
+      - $PWD/webui:/webui
+    ports:
+      - "80:8501"
     stdin_open: true
     tty: true
     command: 
