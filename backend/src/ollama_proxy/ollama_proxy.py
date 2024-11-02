@@ -54,16 +54,7 @@ class OllamaProxy:
         self.chat_model_max_input_tokens = utils.get_chat_model_max_input_tokens()
 
         self.messages = [
-            {"role": "system", "content": prompts.CHAT_SYSTEM_PROMPT}
-        ]
-
-    def _add_message(self, role, content):
-        self.messages.append({"role": role, "content": content})
-
-    def clear_messages(self):
-        self.messages.clear()
-        self.messages[
-            {"role": "system", "content": prompts.CHAT_SYSTEM_PROMPT}
+            {"role": "system", "content": prompts.QA_SYSTEM_PROMPT}
         ]
     
     async def embed(self, text: str | list[str]) -> list[list[float]]:
@@ -78,10 +69,13 @@ class OllamaProxy:
     
     async def chat(self, user_input: str, context: list[str] = None):
         # TODO: format message to include context
-        self._add_message("user", utils.format_message(context, user_input))
+        _query_with_context = self.messages + [{
+            "role": "user",
+            "content": utils.format_query(context, user_input)
+        }]
         response = await self.client.chat(
             model=self.chat_model_name,
-            messages=self.messages, 
+            messages=_query_with_context, 
             stream = True,
             # format='json'
         )
@@ -91,11 +85,13 @@ class OllamaProxy:
             yield json.dumps(chunk) + '\n'
 
     async def summarize(self, text: list[str]):
-        messages = [{"role": "system", "content": prompts.SUMMARIZE_SYSTEM_PROMPT}]
-        messages.append({"role": "user", "content": "".join(text)})
+        _summary_task = [
+            {"role": "system", "content": prompts.SUMMARIZE_SYSTEM_PROMPT},
+            {"role": "user", "content": utils.format_summary_prompt(text)}
+        ]
         summary = await self.client.chat(
             model=self.chat_model_name,
-            messages=messages,
+            messages=_summary_task,
         )
 
         return summary["message"]["content"]
