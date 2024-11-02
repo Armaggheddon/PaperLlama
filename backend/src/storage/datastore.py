@@ -1,9 +1,6 @@
-# from embedding import OllamaEmbed
-from ctypes import util
 import os
-import hashlib
-from re import sub
 import uuid
+import shutil
 
 from .vector_db import VectorDB
 from .metadata_db import MetadataDB
@@ -122,16 +119,31 @@ class DataStore:
         
         return chunk_texts
 
-    def get_document_names(self):
+    def get_all_documents(self):
         # get all the document names from the root metadata db
-        pass
+        return self.metadata_db.get_all_documents()
+        
 
-    def delete_document(self, document_name: str):
-        # delete the document from the root metadata db
-        # delete the document from the vector db
-        # delete the document from the sub index
-        # delete the document from the sub index metadata db
-        pass
+    def delete_document_by_ids(self, document_ids: list[int]):
+        subindex_filenames = self.metadata_db.get_documents_for_ids(document_ids)
+        for subindex_filename in subindex_filenames:
+            self.vector_db.delete(subindex_filename)
+            self.metadata_db.delete(subindex_filename)
+            os.remove(os.path.join(FILES_PATH, f"{subindex_filename}.pdf"))
+        
+        self.vector_db.remove_from_root(document_ids)
+        self.metadata_db.remove_document_from_root(document_ids)
+
+    def delete_all(self):
+        self.vector_db.clear_root()
+        self.metadata_db.clear_root()
+
+        shutil.rmtree(SUB_INDEX_PATH)
+        shutil.rmtree(FILES_PATH)
+
+        os.makedirs(SUB_INDEX_PATH)
+        os.makedirs(FILES_PATH)
+        
 
     def close(self):
         self.vector_db.close()

@@ -1,14 +1,16 @@
 import asyncio
 from contextlib import asynccontextmanager
+from operator import is_
 from fastapi import FastAPI, UploadFile
 from fastapi.responses import StreamingResponse
 import ollama
 from concurrent.futures import ThreadPoolExecutor
 
-from parser.pdf_parse import to_chunks, Page
+from parser.pdf_parse import to_chunks
 from ollama_proxy import OllamaProxy
 from storage import DataStore 
 
+import api_models
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,20 +45,20 @@ async def stream_response(text):
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
     return StreamingResponse(ollama_proxy.chat(text), media_type="text/event-stream")
 
-@app.post("/add_document")
+@app.post("/add_document", response_model=api_models.UploadFileResponse)
 async def add_document(document: UploadFile):
     document_bytes = await document.read()
     if not document.filename.endswith(".pdf"):
-        return {"status": "Document must be a PDF file"}
+        return api_models.UploadFileResponse(is_success=False, message="Only PDF files are supported")
     
     print(f"Received document: {document.filename} of size {len(document_bytes)}")
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
     datastore: DataStore = app.state.datastore
 
     if datastore.has_document(document_bytes):
-        return {"status": "Document already exists in the datastore"}
+        return api_models.UploadFileResponse(is_success=False, message="Document already exists in the datastore")
 
-    text_chunks = to_chunks(document_bytes, 512, 128)
+    text_chunks = to_chunks(document_bytes, 256, 32)
     print(f"Document has been parsed in {len(text_chunks)} chunks")
     embeddings = await ollama_proxy.embed(text_chunks)
     print(f"Document has been embedded in {len(embeddings)} chunks")
@@ -83,7 +85,7 @@ async def add_document(document: UploadFile):
 
     print(f"Document has been added to the datastore")
     
-    return {"status": "ok"}
+    return api_models.UploadFileResponse(is_success=True)
 
 @app.get("/query")
 async def query(text):
@@ -106,14 +108,44 @@ async def query(text):
         media_type="application/x-ndjson"
     )
 
-@app.get("/clear_chat")
-async def clear_chat():
-    ollama_proxy: OllamaProxy = app.state.ollama_proxy
-    ollama_proxy.clear_messages()
+@app.post("/delete_all")
+async def delete_all(delete_all_request: api_models.DeleteAllRequest):
+    if not delete_all_request.confirm:
+        return {"status": "confirm must be true to delete all documents"}
+    datastore: DataStore = app.state.datastore
+    
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        await loop.run_in_executor(
+            pool,
+            datastore.delete_all
+        )
+
+    return {"status": "ok"}
+
+@app.post("/delete_document_by_id")
+async def delete_document_by_id(delete_document_request: api_models.DeleteIndexIdsRequest):
+    datastore: DataStore = app.state.datastore
+
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        await loop.run_in_executor(
+            pool,
+            datastore.delete_document_by_ids,
+            delete_document_request.index_ids
+        )
 
     return {"status": "ok"}
 
 @app.get("/available_documents")
 async def available_documents():
+    datastore: DataStore = app.state.datastore
 
-    return app.state.faiss_db.get_all("root")
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        documents = await loop.run_in_executor(
+            pool,
+            datastore.get_all_documents
+        )
+
+    return documents

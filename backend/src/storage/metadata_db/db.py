@@ -95,6 +95,15 @@ class MetadataDB:
                 )
             )
 
+    def remove_document_from_root(self, document_ids: list[int]):
+        with self.root_conn as conn:
+            cursor = conn.cursor()
+            for document_id in document_ids:
+                cursor.execute(
+                    f"DELETE FROM {_root_metadata_table['table_name']} WHERE faiss_id = ?",
+                    (document_id,)
+                )
+            cursor.close()
 
     def add_document(
             self, subindex_filename, faiss_ids, pages, text_chunks, overwrite=False
@@ -129,4 +138,19 @@ class MetadataDB:
         cursor.close()
         conn.close()
         return [ct[0] for ct in chunk_texts]
+    
+    def get_all_documents(self):
+        cursor = self.root_conn.cursor()
+        cursor.execute(f"SELECT id, user_filename, document_summary FROM {_root_metadata_table['table_name']}")
+        documents = cursor.fetchall()
+        cursor.close()
+        return [{"id": d[0], "user_filename": d[1], "document_summary": d[2]} for d in documents]
 
+    def clear_root(self):
+        with self.root_conn as conn:
+            conn.execute(f"DELETE FROM {_root_metadata_table['table_name']}")
+
+    def delete(self, subindex_filename: str):
+        db_path = os.path.join(self.subindex_path, f"{subindex_filename}.{_DB_FILE_EXTENSION}")
+        if os.path.isfile(db_path):
+            os.remove(db_path)
