@@ -2,6 +2,8 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile
 from fastapi.responses import StreamingResponse
+import ollama
+from concurrent.futures import ThreadPoolExecutor
 
 from parser.pdf_parse import to_chunks, Page
 from ollama_proxy import OllamaProxy
@@ -44,6 +46,9 @@ async def stream_response(text):
 @app.post("/add_document")
 async def add_document(document: UploadFile):
     document_bytes = await document.read()
+    if not document.filename.endswith(".pdf"):
+        return {"status": "Document must be a PDF file"}
+    
     print(f"Received document: {document.filename} of size {len(document_bytes)}")
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
     datastore: DataStore = app.state.datastore
@@ -60,17 +65,52 @@ async def add_document(document: UploadFile):
     summary_embedding = await ollama_proxy.embed(document_summary)
     print(f"Summary has been embedded")
 
-    datastore.add_document(
-        file_name=document.filename,
-        file_bytes=document_bytes,
-        summary_embedding=summary_embedding,
-        summary_text=document_summary,
-        embeddings=embeddings,
-        text_chunks=text_chunks
-    )
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        add_document_args = {
+            "file_name": document.filename,
+            "file_bytes": document_bytes,
+            "summary_embedding": summary_embedding,
+            "summary_text": document_summary,
+            "embeddings": embeddings,
+            "text_chunks": text_chunks
+        }
+        await loop.run_in_executor(
+            pool,
+            datastore.add_document,
+            *(list(add_document_args.values()))
+        )
 
     print(f"Document has been added to the datastore")
     
+    return {"status": "ok"}
+
+@app.get("/query")
+async def query(text):
+    ollama_proxy: OllamaProxy = app.state.ollama_proxy
+    datastore: DataStore = app.state.datastore
+
+    query_embedding = await ollama_proxy.embed(text)
+    
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        chunk_texts = await loop.run_in_executor(
+            pool,
+            datastore.query,
+            query_embedding
+        )
+
+    return StreamingResponse(
+        ollama_proxy.chat(text, chunk_texts), 
+        # media_type="application/json"
+        media_type="application/x-ndjson"
+    )
+
+@app.get("/clear_chat")
+async def clear_chat():
+    ollama_proxy: OllamaProxy = app.state.ollama_proxy
+    ollama_proxy.clear_messages()
+
     return {"status": "ok"}
 
 @app.get("/available_documents")

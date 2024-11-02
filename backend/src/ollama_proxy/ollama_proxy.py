@@ -1,6 +1,8 @@
+import json
 from ollama import AsyncClient
 
 from . import utils
+from . import prompts
 
 # class OllamaEmbed:
 
@@ -50,8 +52,23 @@ class OllamaProxy:
 
         self.chat_model_name = utils.get_chat_model_name()
         self.chat_model_max_input_tokens = utils.get_chat_model_max_input_tokens()
+
+        self.messages = [
+            {"role": "system", "content": prompts.CHAT_SYSTEM_PROMPT}
+        ]
+
+    def _add_message(self, role, content):
+        self.messages.append({"role": role, "content": content})
+
+    def clear_messages(self):
+        self.messages.clear()
+        self.messages[
+            {"role": "system", "content": prompts.CHAT_SYSTEM_PROMPT}
+        ]
     
-    async def embed(self, text: list[str]) -> list[list[float]]:
+    async def embed(self, text: str | list[str]) -> list[list[float]]:
+        if isinstance(text, str):
+            text = [text]
         text_embeddings = await self.client.embed(
             model=self.embed_model_name, 
             input=text
@@ -61,21 +78,20 @@ class OllamaProxy:
     
     async def chat(self, user_input: str, context: list[str] = None):
         # TODO: format message to include context
-        messages = [
-            {"role": "system", "content": "You are a smart llm that will chat with the following context. Please chat with the following context."},
-            {"role": "user", "content": user_input}
-        ]
+        self._add_message("user", utils.format_message(context, user_input))
         response = await self.client.chat(
-            model=self.chat_model_name, 
-            messages=messages, 
-            stream = True
+            model=self.chat_model_name,
+            messages=self.messages, 
+            stream = True,
+            # format='json'
         )
 
         async for chunk in response:
-            yield chunk["message"]["content"]
+            # yield chunk["message"]["content"]  # this just returns the text
+            yield json.dumps(chunk) + '\n'
 
     async def summarize(self, text: list[str]):
-        messages = [{"role": "system", "content": "You are a smart llm that will summarize the following texts. Please summarize the following texts."}]
+        messages = [{"role": "system", "content": prompts.SUMMARIZE_SYSTEM_PROMPT}]
         messages.append({"role": "user", "content": "".join(text)})
         summary = await self.client.chat(
             model=self.chat_model_name,

@@ -9,3 +9,6 @@ def generate_index_ids(start: int, count: int) -> list[int]:
 
 def list_to_numpy(ids: list[int]) -> np.ndarray:
     return np.array(ids)
+
+def indices_to_list(indices: np.ndarray) -> list[int]:
+    return indices.tolist()

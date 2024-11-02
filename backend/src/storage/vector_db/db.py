@@ -1,3 +1,4 @@
+from ctypes import util
 import os
 import pathlib
 
@@ -16,7 +17,7 @@ class VectorDB:
         sub_index_path: str
     ) -> None:
         self.embedding_length = embedding_length
-        self.root_index_path = pathlib.Path(data_root) / root_index_name
+        self.root_index_path = pathlib.Path(data_root) / f"{root_index_name}.{_INDEX_EXTENSION}"
         
         if not os.path.isfile(str(self.root_index_path)):
             tmp_index = faiss.IndexFlatL2(self.embedding_length)
@@ -80,21 +81,22 @@ class VectorDB:
         tmp_index: faiss.IndexFlatL2 = self._touch_index(str(index_path))
         return tmp_index.ntotal
 
-    def query_root(self, vector: list[float], top_k: int):
-        query_embedding = utils.embeddings_to_numpy([vector])
+    def query_root(self, vector: list[float], top_k: int) -> list[int]:
+        query_embedding = utils.embeddings_to_numpy(vector)
         faiss.normalize_L2(query_embedding)
-        D, I = self.root_index.search(query_embedding, top_k)
-        return D, I
+        _, I = self.root_index.search(query_embedding, min(self.root_index.ntotal, top_k))
+        return utils.indices_to_list(I[0])
 
-    def query(self, index_path: str, vector: list[float], top_k: int):
+    def query(self, index_name: str, vector: list[float], top_k: int) -> list[int]:
+        index_path = pathlib.Path(self.sub_index_path) / f"{index_name}.{_INDEX_EXTENSION}"
         if not os.path.isfile(index_path):
             raise ValueError(f"Index {index_path} does not exist")
 
-        tmp_index: faiss.IndexFlatL2 = faiss.read_index(index_path)
-        query_embedding = utils.embeddings_to_numpy([vector])
+        tmp_index: faiss.IndexFlatL2 = faiss.read_index(str(index_path))
+        query_embedding = utils.embeddings_to_numpy(vector)
         faiss.normalize_L2(query_embedding)
-        D, I = tmp_index.search(query_embedding, top_k)
-        return D, I
+        _, I = tmp_index.search(query_embedding, min(tmp_index.ntotal, top_k))
+        return utils.indices_to_list(I[0])
 
     def close(self):
         faiss.write_index(self.root_index, str(self.root_index_path))

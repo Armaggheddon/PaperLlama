@@ -11,8 +11,8 @@ from .metadata_db import MetadataDB
 from . import utils
 
 DATA_ROOT = "/vector_index"
-ROOT_INDEX_NAME = "root.index"
-ROOT_DB_NAME = "root.db"
+ROOT_INDEX_NAME = "root_index"
+ROOT_DB_NAME = "root_metadata"
 SUB_INDEX_PATH = "/vector_index/sub_indexes"
 FILES_PATH = "/vector_index/files"
 
@@ -69,10 +69,6 @@ class DataStore:
         # add to sub index
         # add to sub index metadata db
         file_hash = utils.hash_file(file_bytes)
-        has_file = self.metadata_db.has_document(file_hash)
-
-        if has_file and not overwrite:
-            raise RuntimeError("File already exists in the database!!")
         
         # save the file
         base_file_name = str(uuid.uuid4())
@@ -111,11 +107,20 @@ class DataStore:
         top_k_files: int=3, 
         top_k_chunks: int=5
     ):
-        # get the embeddings
-        # query the vector db
-        # get the metadata
-        # return the relevant chunks
-        pass
+        
+        root_ids = self.vector_db.query_root(query_embedding, top_k_files)
+        subindex_names = self.metadata_db.get_documents_for_ids(root_ids)
+
+        print(f"Root ids: {root_ids}")
+        print(f"File names: {subindex_names}")
+
+        chunk_texts = []
+        for subindex_name in subindex_names:
+            sub_index_chunks_ids = self.vector_db.query(subindex_name, query_embedding, top_k_chunks)
+            sub_index_text_chunks = self.metadata_db.get_document_chunks_for_ids(subindex_name, sub_index_chunks_ids)
+            chunk_texts.extend(sub_index_text_chunks)
+        
+        return chunk_texts
 
     def get_document_names(self):
         # get all the document names from the root metadata db
