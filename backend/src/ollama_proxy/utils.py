@@ -15,6 +15,9 @@ def get_embedding_model_max_input_tokens():
 def get_chat_model_name():
     return os.getenv("CHAT_MODEL_NAME", "llama3.2:1b")
 
+def get_instruct_model_name():
+    return os.getenv("CHAT_MODEL_NAME", "llama3.2:1b-instruct-q4_0")
+
 def get_chat_model_max_input_tokens():
     return int(os.getenv("CHAT_MODEL_MAX_INPUT_TOKENS", 8192))
 
@@ -27,5 +30,11 @@ def format_query(context: list[str], user_input: str) -> str:
     return prompts.QA_USER_PROMPT_TEMPLATE.format(
         context_str=_context,
         query_str=user_input
+    )
+
+def format_rerank_prompt(document_summary: str, user_query: str) -> str:
+    return prompts.DOCUMENT_RERANK_PROMPT_TEMPLATE.format(
+        document_summary=document_summary,
+        user_query=user_query
     )
     

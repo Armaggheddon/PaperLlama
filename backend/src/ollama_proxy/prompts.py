@@ -20,12 +20,6 @@ SUMMARIZE_PROMPT_TEMPLATE = (
     "Summary:"
 )
 
-
-BEGIN_CONTEXT_TOKEN = "<|startofcontext|>"
-END_CONTEXT_TOKEN = "<|endofcontext|>"
-BEGIN_USER_INPUT_TOKEN = "<|startofuserinput|>"
-END_USER_INPUT_TOKEN = "<|endofuserinput|>"
-
 QA_SYSTEM_PROMPT = (
     "You are an expert assistant providing responses based solely "
     "on the provided context. Answer only based on the available information, "
@@ -47,4 +41,29 @@ QA_USER_PROMPT_TEMPLATE = (
     "If the context does not contain sufficient information, "
     "respond with 'I don't know' or 'The available data does"
     "not provide this information.'"
+)
+
+DOCUMENT_RERANK_SYSTEM_PROMPT = (
+    "You are an assistant that evaluates the relevance of documents based "
+    "on a given user query. Your task is to analyze the text chunk provided "
+    "and determine if it directly addresses or is useful for answering "
+    "the query. If the text chunk is relevant, respond with "
+    "{{\"relevant\": \"yes\"}}, and if it is not relevant, "
+    "respond with {{\"relevant\": \"no\"}}. Provide only the "
+    "JSON output without any additional commentary."
+)
+
+DOCUMENT_RERANK_PROMPT_TEMPLATE = (
+    "Given the following text chunk and user query, classify "
+    "whether the document is relevant to the query.\n"
+    "\n"
+    "Document Summary:\n"
+    "{document_summary}\n"
+    "\n"
+    "User Query:\n"
+    "\n"
+    "{user_query}\n"
+    "\n"
+    "Provide your answer in JSON format as "
+    "{{\"relevant\": \"yes\"}} or {{\"relevant\": \"no\"}}."
 )
