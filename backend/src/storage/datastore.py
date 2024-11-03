@@ -1,9 +1,13 @@
 import os
+from re import sub
+from urllib.parse import quote_from_bytes
 import uuid
 import shutil
+from typing import Callable
+import asyncio
 
 from .vector_db import VectorDB
-from .metadata_db import MetadataDB
+from .metadata_db import MetadataDB, BaseMetadata
 
 from . import utils
 
@@ -99,14 +103,14 @@ class DataStore:
         )
 
     def query(
-        self, 
+        self,
         query_embedding: list[float], 
         top_k_files: int=3, 
         top_k_chunks: int=5
     ):
         
         root_ids = self.vector_db.query_root(query_embedding, top_k_files)
-        subindex_names = self.metadata_db.get_documents_for_ids(root_ids)
+        subindex_names: list[str] = self.metadata_db.get_documents_for_ids(root_ids)
 
         print(f"Root ids: {root_ids}")
         print(f"File names: {subindex_names}")
@@ -114,14 +118,17 @@ class DataStore:
         chunk_texts = []
         for subindex_name in subindex_names:
             sub_index_chunks_ids = self.vector_db.query(subindex_name, query_embedding, top_k_chunks)
-            sub_index_text_chunks = self.metadata_db.get_document_chunks_for_ids(subindex_name, sub_index_chunks_ids)
+            sub_index_text_chunks: list[str] = self.metadata_db.get_document_chunks_for_ids(subindex_name, sub_index_chunks_ids)
+            
             chunk_texts.extend(sub_index_text_chunks)
-        
         return chunk_texts
 
     def get_all_documents(self):
         # get all the document names from the root metadata db
         return self.metadata_db.get_all_documents()
+    
+    def get_document_count(self):
+        return self.metadata_db.get_document_count()
         
 
     def delete_document_by_ids(self, document_ids: list[int]):
