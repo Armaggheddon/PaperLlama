@@ -1,5 +1,4 @@
 import requests
-import json
 
 import pandas as pd
 import streamlit as st
@@ -20,17 +19,15 @@ def get_available_files() -> list[dict[int, str, str]]:
     return formatted
 
 def delete_all_files_request():
-    data = json.dumps({"confirm": True})
+    data = {"confirm": True}
     response = requests.post("http://backend:8000/delete_all", json=data)
-    print(response)
+    print(response.text)
 
 def batch_delete_request(ids_to_delete: list[int]):
-    data = json.dumps({"index_ids": ids_to_delete})
-    response = requests.delete("http://backend:8000/delete_document_by_id", json=data)
+    data = {"index_ids": ids_to_delete}
+    response = requests.post("http://backend:8000/delete_document_by_id", json=data)
+    print(response.text)
 
-
-def toggle_file_select(file_id):
-    st.session_state["selected_files"][file_id] = not st.session_state["selected_files"][file_id]
 
 event = None
 
@@ -39,9 +36,13 @@ def delete_files(delete_all: bool):
     def on_click_yes():
         if delete_all:
             delete_all_files_request()
+            st.session_state.pop("files")
         else:
             if event and event.selection:
                 ids_to_delete = data_df.iloc[event.selection["rows"]]["file_id"].tolist()
+                batch_delete_request(ids_to_delete)
+                st.session_state.pop("files")
+                event.selection.clear()
         st.rerun()
 
     def on_click_no():
@@ -68,9 +69,6 @@ def delete_files(delete_all: bool):
 
 if "files" not in st.session_state:
     st.session_state["files"] = get_available_files()
-    st.session_state["selected_files"] = {}
-    for file_id, _ in st.session_state["files"].items():
-        st.session_state["selected_files"][file_id] = False
 
 
 st.title("Manage knowledge")
@@ -84,40 +82,24 @@ st.markdown(
     "to accurate and essential information for generating responses."
 )
 
+
 st.divider()
-cols = st.columns(2)
+cols = st.columns(3)
 with cols[0]:
-    st.button("Delete selected", type="secondary", on_click=delete_files, args=[False])
+    if st.button("Refresh", icon="🔃"):
+        st.session_state.pop("files")
+        st.rerun()
 with cols[1]:
+    st.button("Delete selected", type="secondary", on_click=delete_files, args=[False])
+with cols[2]:
     st.button("Delete all", type="primary", on_click=delete_files, args=[True])
 st.divider()
 
 
 if len(st.session_state["files"]) != 0:
-    # columns = st.columns([0.1, 0.3, 0.6], vertical_alignment="center")
-    # with columns[0]:
-    #     st.text("Select")
-    # with columns[1]:
-    #     st.text("File name")
-    # with columns[2]:
-    #     st.text("Summary")
-
-    # for file_id, file_info in st.session_state["files"].items():
-        
-    #     with st.container(border = st.session_state["selected_files"][file_id]) as container:
-            
-    #             columns = st.columns([0.1, 0.3, 0.6], vertical_alignment="center")
-    #             with columns[0]:
-    #                 st.checkbox(label = "", value = st.session_state["selected_files"][file_id], key=file_id, on_change=toggle_file_select, args=[file_id])
-    #             with columns[1]:
-    #                 st.text(file_info["file_name"])
-
-    #             with columns[2]:
-    #                 st.write(file_info["summary"][:50] + "...")
     
     data_df = pd.DataFrame(
         {
-            # "Selected": [selected for selected in st.session_state["selected_files"].values()],
             "file_id": [file_id for file_id in st.session_state["files"].keys()],
             "File name": [info["file_name"] for info in st.session_state["files"].values()],
             "Summary": [info["summary"] for info in st.session_state["files"].values()]
