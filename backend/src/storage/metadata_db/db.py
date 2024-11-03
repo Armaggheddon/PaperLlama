@@ -65,6 +65,13 @@ class MetadataDB:
         result = cursor.fetchone() is not None
         cursor.close()
         return result
+    
+    def get_document_count(self) -> int:
+        cursor = self.root_conn.cursor()
+        cursor.execute(f"SELECT COUNT(*) FROM {_root_metadata_table['table_name']}")
+        count = cursor.fetchone()[0]
+        cursor.close()
+        return count
 
     def add_document_to_root(
         self, 
