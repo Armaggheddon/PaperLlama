@@ -92,18 +92,29 @@ async def query(text):
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
     datastore: DataStore = app.state.datastore
 
+    if datastore.get_document_count() == 0:
+        return {"message": {"content": "No documents in the datastore", "type": "error"}}
+
     query_embedding = await ollama_proxy.embed(text)
     
     loop = asyncio.get_running_loop()
     with ThreadPoolExecutor() as pool:
+        query_args = {
+            "query_embedding": query_embedding,
+        }
+        
         chunk_texts = await loop.run_in_executor(
             pool,
             datastore.query,
-            query_embedding
+            *(list(query_args.values()))
         )
 
+    reranked_chunk_texts = await ollama_proxy.rerank(text, chunk_texts)
+    if not reranked_chunk_texts:
+        return {"message": {"content": "No relevant documents found", "type": "error"}}
+    
     return StreamingResponse(
-        ollama_proxy.chat(text, chunk_texts), 
+        ollama_proxy.chat(text, reranked_chunk_texts), 
         # media_type="application/json"
         media_type="application/x-ndjson"
     )
