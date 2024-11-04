@@ -16,7 +16,7 @@ def get_chat_model_name():
     return os.getenv("CHAT_MODEL_NAME", "llama3.2:1b")
 
 def get_instruct_model_name():
-    return os.getenv("CHAT_MODEL_NAME", "llama3.2:1b-instruct-q4_0")
+    return os.getenv("INSTRUCT_MODEL_NAME", "llama3.2:1b-instruct-q4_0")
 
 def get_chat_model_max_input_tokens():
     return int(os.getenv("CHAT_MODEL_MAX_INPUT_TOKENS", 8192))
