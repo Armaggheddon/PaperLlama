@@ -2,9 +2,6 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
-    # ports:
-    #   - "11434:11434"
-    # if gpu uncomment the following
     volumes:
       - ollama_data:/root/.ollama
     deploy:
@@ -27,8 +24,9 @@ services:
       - database_data:/vector_index
     environment:
       - EMBEDDING_MODEL_NAME=nomic-embed-text
-      - EMBEDDING_VECTOR_SIZE=768
-      # - INSTRUCT_MODEL_NAME=llama3.2:1b-instruct
+      - EMBEDDING_MODEL_OUTPUT_SIZE=768
+      - CHAT_MODEL_NAME=llama3.2:1b
+      - INSTRUCT_MODEL_NAME=llama3.2:1b-instruct-q4_0
     stdin_open: true
     tty: true
     command: 
