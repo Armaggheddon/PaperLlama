@@ -18,6 +18,8 @@ services:
       context: backend
       dockerfile: Dockerfile_backend
     container_name: backend
+    volumes:
+      - database_data:/vector_index
     ports:
       - "8080:8000"
     environment:
