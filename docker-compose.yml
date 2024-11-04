@@ -18,8 +18,8 @@ services:
       context: backend
       dockerfile: Dockerfile_backend
     container_name: backend
-    ports:
-      - "8080:8000"
+    volumes:
+      - database_data:/vector_index
     environment:
       - EMBEDDING_MODEL_NAME=nomic-embed-text
       - EMBEDDING_MODEL_OUTPUT_SIZE=768
