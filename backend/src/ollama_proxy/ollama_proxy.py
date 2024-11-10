@@ -1,5 +1,6 @@
 import json
 import asyncio
+from click import option
 from ollama import AsyncClient
 
 from . import utils
@@ -67,7 +68,7 @@ class OllamaProxy:
             model=self.embed_model_name, 
             input=text
         )
-        print(text_embeddings.keys())
+        # print(text_embeddings.keys())
         return text_embeddings["embeddings"]
     
     async def chat(self, user_input: str, context: list[str] = None):
@@ -86,17 +87,34 @@ class OllamaProxy:
         async for chunk in response:
             yield json.dumps(chunk) + '\n'
 
-    async def summarize(self, text: list[str]):
+    async def summarize(self, text: list[str]) -> str:
         _summary_task = [
             {"role": "system", "content": prompts.SUMMARIZE_SYSTEM_PROMPT},
             {"role": "user", "content": utils.format_summary_prompt(text)}
         ]
-        summary = await self.client.chat(
+
+        chunk_summaries = await asyncio.gather(*[
+            self.client.generate(
+                model=self.instruct_model_name,
+                system=prompts.SUMMARIZE_SYSTEM_PROMPT,
+                prompt=chunk,
+                options={"temperature": 0.0}
+            )
+            for chunk in text
+        ])
+
+        summary = await self.client.generate(
             model=self.instruct_model_name,
-            messages=_summary_task,
+            system=prompts.SUMMARIZE_SYSTEM_PROMPT,
+            prompt=" ".join([summary["response"] for summary in chunk_summaries]),
+            options={"temperature": 0.0}
         )
 
-        return summary["message"]["content"]
+        # print(summary.keys())
+        # print("\n------------------------------\n")
+        # print(summary["response"])
+
+        return summary["response"]
     
     async def rerank(self, user_query, text_chunks: list[str]) -> list[str]:
         _rerank_system_prompt = [

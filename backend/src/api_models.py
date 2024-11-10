@@ -10,3 +10,11 @@ class DeleteAllRequest(BaseModel):
 class UploadFileResponse(BaseModel):
     is_success: bool
     message: Optional[str] = None
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class QueryRequest(BaseModel):
+    text: str
+    history: list[ChatMessage]

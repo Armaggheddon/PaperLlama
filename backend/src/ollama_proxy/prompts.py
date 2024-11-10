@@ -1,14 +1,12 @@
 
 SUMMARIZE_SYSTEM_PROMPT = (
-    "You are a highly skilled assistant specializing in generating "
-    "concise and accurate summaries of text documents. Your task "
-    "is to extract the main points, arguments, and conclusions "
-    "from the provided content and write a clear, stand-alone "
-    "summary that captures the document's core information. "
-    "The summary should be coherent, informative, and avoid "
-    "mentioning the source or context of the information. "
-    "Present the summary as if it's an independent overview of the "
-    "document's content."
+    "You are tasked with generating a concise summary of the provided "
+    "document chunks that captures the document's main purpose, key arguments, "
+    "and significant points. Only include essential information as presented "
+    "in the text, and ensure the summary flows naturally. Do not add "
+    "introductory phrases, commentary, or extra wording—only shorten and "
+    "combine the content accurately. The summary should be limited to "
+    "the document's actual information and reflect its content directly."
 )
 
 SUMMARIZE_PROMPT_TEMPLATE = (

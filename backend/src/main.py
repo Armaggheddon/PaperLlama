@@ -1,27 +1,39 @@
 import asyncio
 from contextlib import asynccontextmanager
-from operator import is_
-from fastapi import FastAPI, UploadFile
-from fastapi.responses import StreamingResponse
-import ollama
+from genericpath import isfile
+from http import client
+from pathlib import Path
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
+import uuid
+import os
 
-from parser.pdf_parse import to_chunks
+from fastapi import FastAPI, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
+import httpx
+import aiofiles
+
 from ollama_proxy import OllamaProxy
-from storage import DataStore 
 
 import api_models
+import remotes.datastore as datastore
+import remotes.document_converter as document_converter
+
+
+_UPLOADED_FILES_PATH = Path("/uploaded_files")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     
     # app.state.ollama_embed = await OllamaEmbed.create("ollama", 11434)
     app.state.ollama_proxy = await OllamaProxy.create("ollama", 11434)
-    app.state.datastore = DataStore(app.state.ollama_proxy.embed_model_output)
+    app.state.httpx_client = httpx.AsyncClient()
+    # app.state.datastore = DataStore(app.state.ollama_proxy.embed_model_output)
     yield
 
     # Stop the app
-    app.state.datastore.close()
+    # app.state.datastore.close()
 
 
 app = FastAPI(
@@ -40,6 +52,12 @@ async def generate_response():
         yield f"{very_long_text[i]}"
 
 
+@app.get("/embedding_length")
+async def get_embedding_length():
+    ollama_proxy: OllamaProxy = app.state.ollama_proxy
+    return {"embedding_length": ollama_proxy.embed_model_output}
+
+
 @app.get("/chat-stream")
 async def stream_response(text):
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
@@ -53,110 +71,166 @@ async def add_document(document: UploadFile):
     
     print(f"Received document: {document.filename} of size {len(document_bytes)}")
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
-    datastore: DataStore = app.state.datastore
+    client: httpx.AsyncClient = app.state.httpx_client
 
-    if datastore.has_document(document_bytes):
+    document_hash = hashlib.md5(document_bytes).hexdigest()
+    document_ext = document.filename.split(".")[-1]
+    document_name = f"{document_hash}.{document_ext}"
+
+    has_document_response = await client.get(
+        datastore.HAS_DOCUMENT_URL,
+        params={"document_hash": document_hash}
+    )
+    if has_document_response.json()["has_document"]:
         return api_models.UploadFileResponse(is_success=False, message="Document already exists in the datastore")
-
-    text_chunks = to_chunks(document_bytes, 256, 32)
-    print(f"Document has been parsed in {len(text_chunks)} chunks")
+    
+    document_uuid = str(uuid.uuid4())
+    async with aiofiles.open(str(_UPLOADED_FILES_PATH / document_name), "wb") as f:
+        await f.write(document_bytes)
+ 
+    document_parse_response = await client.post(
+        url=document_converter.CONVERT_DOCUMENT_URL,
+        json=document_converter.ConvertDocumentRequest(
+            document_name=document_name).model_dump(),
+        timeout=None
+    )
+    if document_parse_response.status_code != status.HTTP_200_OK:
+        # print(document_parse_response.text) 
+        return api_models.UploadFileResponse(is_success=False, message="Document parsing failed")
+    
+    document_parse_response_json = document_parse_response.json()
+    text_chunks = document_converter.ConvertDocumentResponse(**document_parse_response_json).text_chunks
+    
     embeddings = await ollama_proxy.embed(text_chunks)
-    print(f"Document has been embedded in {len(embeddings)} chunks")
     document_summary = await ollama_proxy.summarize(text_chunks)
-    print(f"Document has been summarized: {document_summary}")
     summary_embedding = await ollama_proxy.embed(document_summary)
-    print(f"Summary has been embedded")
 
-    loop = asyncio.get_running_loop()
-    with ThreadPoolExecutor() as pool:
-        add_document_args = {
-            "file_name": document.filename,
-            "file_bytes": document_bytes,
-            "summary_embedding": summary_embedding,
-            "summary_text": document_summary,
-            "embeddings": embeddings,
-            "text_chunks": text_chunks
-        }
-        await loop.run_in_executor(
-            pool,
-            datastore.add_document,
-            *(list(add_document_args.values()))
-        )
+    datastore_request = datastore.AddDocumentRequest(
+        document_uuid=document_uuid,
+        document_hash_str=document_hash,
+        document_filename=document_name,
+        document_embedding=summary_embedding[0],
+        document_summary=document_summary,
+        document_chunks=[
+            datastore.AddDocumentChunk(
+                text=chunk,
+                page_number=i,
+                embedding=embedding
+            )
+            for i, (chunk, embedding) in enumerate(zip(text_chunks, embeddings))
+        ]
+    )
 
-    print(f"Document has been added to the datastore")
+    datastore_response = await client.post(
+        datastore.ADD_DOCUMENT_URL,
+        json=datastore_request.model_dump(),
+        timeout=None
+    )
+    if datastore_response.status_code != status.HTTP_200_OK:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Datastore failed to add document")
     
     return api_models.UploadFileResponse(is_success=True)
 
-@app.get("/query")
-async def query(text):
+@app.post("/query")
+async def query(request: api_models.QueryRequest):
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
-    datastore: DataStore = app.state.datastore
+    client: httpx.AsyncClient = app.state.httpx_client
 
-    if datastore.get_document_count() == 0:
-        return {"message": {"content": "No documents in the datastore", "type": "error"}}
+    # if datastore.get_document_count() == 0:
+    #     return {"message": {"content": "No documents in the datastore", "type": "error"}}
 
-    query_embedding = await ollama_proxy.embed(text)
+    embedded_query = await ollama_proxy.embed(request.text)
+
+    documents_response = await client.post(
+        datastore.QUERY_ROOT_URL,
+        json=datastore.RootQueryRequest(
+            query_embedding=embedded_query[0]
+        ).model_dump()
+    )
+    if documents_response.status_code != status.HTTP_200_OK:
+        return {"message": {"content": "No relevant documents found", "type": "error"}}
     
-    loop = asyncio.get_running_loop()
-    with ThreadPoolExecutor() as pool:
-        query_args = {
-            "query_embedding": query_embedding,
-        }
-        
-        chunk_texts = await loop.run_in_executor(
-            pool,
-            datastore.query,
-            *(list(query_args.values()))
-        )
+    root_documents = [
+        datastore.RootQueryResult(**doc) for doc in documents_response.json()
+    ]
+    document_query_request = datastore.DocumentQueryRequest(
+        document_uuids=[doc.uuid for doc in root_documents],
+        query_embedding=embedded_query[0]
+    )
 
-    reranked_chunk_texts = await ollama_proxy.rerank(text, chunk_texts)
+    chunks_text_response = await client.post(
+        datastore.QUERY_DOCUMENT_URL,
+        json=document_query_request.model_dump()
+    )
+    # print(chunks_text_response.json())
+    if chunks_text_response.status_code != status.HTTP_200_OK:
+        return {"message": {"content": "No relevant documents found", "type": "error"}}
+    
+    chunk_texts = [
+        datastore.DocumentChunk(**chunk) for chunk in chunks_text_response.json()]
+    
+    text_chunks = [doc_info.text for doc_info in chunk_texts]
+    reranked_chunk_texts = await ollama_proxy.rerank(request.text, text_chunks)
     if not reranked_chunk_texts:
         return {"message": {"content": "No relevant documents found", "type": "error"}}
     
     return StreamingResponse(
-        ollama_proxy.chat(text, reranked_chunk_texts), 
+        ollama_proxy.chat(request.text, reranked_chunk_texts), 
         # media_type="application/json"
         media_type="application/x-ndjson"
     )
 
-@app.post("/delete_all")
+@app.delete("/delete_all")
 async def delete_all(delete_all_request: api_models.DeleteAllRequest):
     if not delete_all_request.confirm:
         return {"status": "confirm must be true to delete all documents"}
-    datastore: DataStore = app.state.datastore
     
-    loop = asyncio.get_running_loop()
-    with ThreadPoolExecutor() as pool:
-        await loop.run_in_executor(
-            pool,
-            datastore.delete_all
-        )
+    client: httpx.AsyncClient = app.state.httpx_client
+
+    delete_all_response = await client.delete(
+        datastore.DELETE_ALL_DOCUMENTS_URL
+    )
+    
+    for file in os.listdir(str(_UPLOADED_FILES_PATH)):
+        os.remove(os.path.join(str(_UPLOADED_FILES_PATH), file))
+
+    if delete_all_response.status_code != status.HTTP_200_OK:
+        return {"status": "error"}
 
     return {"status": "ok"}
 
-@app.post("/delete_document_by_id")
-async def delete_document_by_id(delete_document_request: api_models.DeleteIndexIdsRequest):
-    datastore: DataStore = app.state.datastore
+@app.delete("/delete_document")
+async def delete_document(document_uuid: str):
+    
+    client: httpx.AsyncClient = app.state.httpx_client
 
-    loop = asyncio.get_running_loop()
-    with ThreadPoolExecutor() as pool:
-        await loop.run_in_executor(
-            pool,
-            datastore.delete_document_by_ids,
-            delete_document_request.index_ids
-        )
+    delete_document_response = await client.delete(
+        datastore.DELETE_DOCUMENT_URL,
+        params={"document_uuid": document_uuid}
+    )
+
+    if delete_document_response.status_code != status.HTTP_200_OK:
+        return {"status": "error"}
+    
+    document_filename = delete_document_response.json()["document_filename"]
+    if not document_filename:
+        return {"status": "File does not exist in the datastore"}
+    
+    _document_path = os.path.join(str(_UPLOADED_FILES_PATH), document_filename)
+    if os.path.isfile(_document_path):
+        os.remove(_document_path)
 
     return {"status": "ok"}
 
-@app.get("/available_documents")
+@app.get("/documents_info")
 async def available_documents():
-    datastore: DataStore = app.state.datastore
+    client: httpx.AsyncClient = app.state.httpx_client
 
-    loop = asyncio.get_running_loop()
-    with ThreadPoolExecutor() as pool:
-        documents = await loop.run_in_executor(
-            pool,
-            datastore.get_all_documents
-        )
+    documents_info_response = await client.get(
+        datastore.DOCUMENTS_INFO_URL
+    )
 
-    return documents
+    if documents_info_response.status_code != status.HTTP_200_OK:
+        return {"status": "error"}
+    
+    return documents_info_response.json()

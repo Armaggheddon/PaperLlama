@@ -20,6 +20,9 @@ uploaded_file = st.file_uploader("Upload a pdf file", type="pdf")
 if uploaded_file is not None:
     
     bytes_data = uploaded_file.getvalue()
+
+    st.warning("Do not change page while the file is being processed!")
+
     # todo send request
     success, reason = upload_file(uploaded_file.name, bytes_data)
 

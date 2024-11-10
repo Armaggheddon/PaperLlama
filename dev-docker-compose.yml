@@ -12,6 +12,46 @@ services:
               count: 1
               capabilities: [gpu]
   
+  datastore:
+    build:
+      context: datastore
+      dockerfile: Dockerfile_datastore
+    container_name: datastore
+    ports:
+      - "8100:8000"
+    volumes:
+      - $PWD/datastore:/dev_datastore
+      - database_data:/vector_index
+      - uploaded_files_data:/uploaded_files
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true
+    command: 
+      - /bin/bash
+      # - fastapi run src/main.py
+      
+  document_converter:
+    build:
+      context: document_converter
+      dockerfile: Dockerfile_documentconverter
+    container_name: document_converter
+    volumes:
+      - $PWD/document_converter:/dev_document_converter
+      - document_converter_data:/converter_cache
+      - uploaded_files_data:/uploaded_files
+    stdin_open: true
+    tty: true
+    command: 
+      - /bin/bash
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  
   backend:
     build:
       context: backend
@@ -22,11 +62,15 @@ services:
     volumes:
       - $PWD/backend:/dev_backend
       - database_data:/vector_index
+      - uploaded_files_data:/uploaded_files
     environment:
       - EMBEDDING_MODEL_NAME=nomic-embed-text
       - EMBEDDING_MODEL_OUTPUT_SIZE=768
       - CHAT_MODEL_NAME=llama3.2:1b
       - INSTRUCT_MODEL_NAME=llama3.2:1b-instruct-q4_0
+    depends_on:
+      - document_converter
+      - ollama
     stdin_open: true
     tty: true
     command: 
@@ -41,12 +85,18 @@ services:
       - $PWD/webui:/dev_webui
     ports:
       - "80:8501"
+    depends_on:
+      - backend
     stdin_open: true
     tty: true
     command: 
       - /bin/bash
 
+
+
 volumes:
   database_data:
   ollama_data:
+  document_converter_data:
+  uploaded_files_data:
 
