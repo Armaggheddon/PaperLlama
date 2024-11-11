@@ -150,7 +150,7 @@ class MetadataDB:
         db_path.unlink()
 
     def get_documents_info(self) -> list[DocumentInfo]:
-        query_str = f"SELECT uuid, document_hash, document_filename summary FROM metadata"
+        query_str = f"SELECT uuid, document_hash, document_filename, summary FROM metadata"
         with self._root_db as conn:
             cursor = conn.execute(query_str)
             return [
