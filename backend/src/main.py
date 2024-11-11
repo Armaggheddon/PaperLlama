@@ -181,9 +181,7 @@ async def query(request: api_models.QueryRequest):
     )
 
 @app.delete("/delete_all")
-async def delete_all(delete_all_request: api_models.DeleteAllRequest):
-    if not delete_all_request.confirm:
-        return {"status": "confirm must be true to delete all documents"}
+async def delete_all():
     
     client: httpx.AsyncClient = app.state.httpx_client
 
