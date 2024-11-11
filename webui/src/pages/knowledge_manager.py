@@ -5,29 +5,29 @@ import streamlit as st
 
 
 def get_available_files() -> list[dict[int, str, str]]:
-    response = requests.get("http://backend:8000/available_documents")
+    response = requests.get("http://backend:8000/documents_info")
     
-    json_response = response.json()
+    documents_info = response.json()
+    
     formatted = {}
-    for entry in json_response:
-        _id = entry["id"]
-        _file_name = entry["user_filename"]
-        _summary = entry["document_summary"]
+    for info in documents_info["documents_info"]:
+        _uuid = info["document_uuid"]
+        _file_name = info["document_filename"]
+        _summary = info["document_summary"]
 
-        formatted[_id] = {"file_name": _file_name, "summary": _summary}
+        formatted[_uuid] = {"file_name": _file_name, "summary": _summary}
 
     return formatted
 
 def delete_all_files_request():
-    data = {"confirm": True}
-    response = requests.post("http://backend:8000/delete_all", json=data)
+    response = requests.delete("http://backend:8000/delete_all")
     print(response.text)
 
-def batch_delete_request(ids_to_delete: list[int]):
-    data = {"index_ids": ids_to_delete}
-    response = requests.post("http://backend:8000/delete_document_by_id", json=data)
-    print(response.text)
-
+def batch_delete_request(uuids_to_delete: list[int]):
+    for _uuid in uuids_to_delete:
+        response = requests.delete(
+            "http://backend:8000/delete_document", 
+            params={"document_uuid": _uuid})
 
 event = None
 
@@ -39,7 +39,7 @@ def delete_files(delete_all: bool):
             st.session_state.pop("files")
         else:
             if event and event.selection:
-                ids_to_delete = data_df.iloc[event.selection["rows"]]["file_id"].tolist()
+                ids_to_delete = data_df.iloc[event.selection["rows"]]["document_uuid"].tolist()
                 batch_delete_request(ids_to_delete)
                 st.session_state.pop("files")
                 event.selection.clear()
@@ -50,7 +50,7 @@ def delete_files(delete_all: bool):
 
     if event and event.selection:
         # selected = data_df.iloc[event.selection["rows"]]
-        ids_to_delete = data_df.iloc[event.selection["rows"]]["file_id"].tolist()
+        ids_to_delete = data_df.iloc[event.selection["rows"]]["document_uuid"].tolist()
         print(ids_to_delete)
 
     if delete_all:
@@ -100,7 +100,7 @@ if len(st.session_state["files"]) != 0:
     
     data_df = pd.DataFrame(
         {
-            "file_id": [file_id for file_id in st.session_state["files"].keys()],
+            "document_uuid": [file_id for file_id in st.session_state["files"].keys()],
             "File name": [info["file_name"] for info in st.session_state["files"].values()],
             "Summary": [info["summary"] for info in st.session_state["files"].values()]
         }

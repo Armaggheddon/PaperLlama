@@ -7,7 +7,8 @@ import streamlit as st
 
 def stream_response(message):
     # _history = [{"role": item["role"], "content": item["content"]} for item in history]
-    stream = requests.get("http://backend:8000/query", params={"text": message}, stream=True)
+    request = {"text": message, "history": []}
+    stream = requests.post("http://backend:8000/query", json=request, stream=True)
     running_response = io.StringIO()
     for chunk in stream.iter_lines():
         print(chunk)
