@@ -25,12 +25,11 @@ services:
       - uploaded_files_data:/uploaded_files
     depends_on:
       - backend
-    stdin_open: true
-    tty: true
-    command: 
-      - /bin/bash
-      # - fastapi run src/main.py
-      
+    # stdin_open: true
+    # tty: true
+    # command: 
+    #   - /bin/bash
+
   document_converter:
     build:
       context: document_converter
@@ -40,10 +39,10 @@ services:
       - $PWD/document_converter:/dev_document_converter
       - document_converter_data:/converter_cache
       - uploaded_files_data:/uploaded_files
-    stdin_open: true
-    tty: true
-    command: 
-      - /bin/bash
+    # stdin_open: true
+    # tty: true
+    # command: 
+    #   - /bin/bash
     deploy:
       resources:
         reservations:
@@ -69,12 +68,11 @@ services:
       - CHAT_MODEL_NAME=llama3.2:1b
       - INSTRUCT_MODEL_NAME=llama3.2:1b-instruct-q4_0
     depends_on:
-      - document_converter
       - ollama
-    stdin_open: true
-    tty: true
-    command: 
-      - /bin/bash
+    # stdin_open: true
+    # tty: true
+    # command: 
+    #   - /bin/bash
 
   webui:
     build: 

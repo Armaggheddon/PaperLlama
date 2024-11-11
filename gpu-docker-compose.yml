@@ -11,7 +11,7 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-
+  
   datastore:
     build:
       context: datastore
@@ -31,8 +31,6 @@ services:
     volumes:
       - document_converter_data:/converter_cache
       - uploaded_files_data:/uploaded_files
-    depends_on:
-      - backend
     deploy:
       resources:
         reservations:
@@ -40,13 +38,16 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-
+    depends_on:
+      - backend
+  
   backend:
     build:
       context: backend
       dockerfile: Dockerfile_backend
     container_name: backend
     volumes:
+      - database_data:/vector_index
       - uploaded_files_data:/uploaded_files
     environment:
       - EMBEDDING_MODEL_NAME=nomic-embed-text
@@ -55,9 +56,9 @@ services:
       - INSTRUCT_MODEL_NAME=llama3.2:1b-instruct-q4_0
     depends_on:
       - ollama
-    
+
   webui:
-    build:
+    build: 
       context: webui
       dockerfile: Dockerfile_webui
     container_name: webui
@@ -65,10 +66,12 @@ services:
       - "80:8501"
     depends_on:
       - backend
-  
+      - ollama
+
 
 volumes:
   database_data:
   ollama_data:
   document_converter_data:
   uploaded_files_data:
+
