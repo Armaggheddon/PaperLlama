@@ -148,7 +148,7 @@ class DataStore:
             
         return result
     
-    def get_documents_info(self) -> None:
+    def get_documents_info(self) -> DocumentInfoResponse:
         documents_info = self.metadata_db.get_documents_info()
         return DocumentInfoResponse(
             document_count=len(documents_info),

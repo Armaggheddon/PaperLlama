@@ -37,3 +37,6 @@ class DocumentInfo(BaseModel):
 class DocumentInfoResponse(BaseModel):
     document_count: int
     documents_info: list[DocumentInfo]
+
+class HasDocumentResponse(BaseModel):
+    has_document: bool

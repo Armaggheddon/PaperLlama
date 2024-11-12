@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, HTTPException, status
 
-from api_models import DocumentQueryRequest, RootQueryRequest, AddDocumentRequest
+import api_models
 from storage import DataStore
 
 @asynccontextmanager
@@ -34,13 +34,23 @@ app = FastAPI(
 async def health():
     return {"status": "ok"}
 
-@app.get("/has_document")
+@app.get("/has_document_uuid")
+async def has_document_uuid(document_uuid: str):
+    datastore: DataStore = app.state.datastore
+    return {"has_document_uuid": datastore.has_document_uuid(document_uuid)}
+
+@app.get("/has_document", response_model=api_models.HasDocumentResponse)
 async def has_document(document_hash: str):
     datastore: DataStore = app.state.datastore
-    return {"has_document": datastore.has_document(document_hash)}
+    return api_models.HasDocumentResponse(has_document=datastore.has_document(document_hash))
+
+@app.get("/has_document_uuid", response_model=api_models.HasDocumentResponse)
+async def has_document_uuid(document_uuid: str):
+    datastore: DataStore = app.state.datastore
+    return api_models.HasDocumentResponse(has_document=datastore.has_document_uuid(document_uuid))
 
 @app.post("/add_document")
-async def add_document(request: AddDocumentRequest):
+async def add_document(request: api_models.AddDocumentRequest):
     datastore: DataStore = app.state.datastore
     
     loop = asyncio.get_running_loop()
@@ -80,18 +90,18 @@ async def delete_all():
     with ThreadPoolExecutor() as pool:
         await loop.run_in_executor(pool, datastore.clear)
 
-@app.post("/query_root")
-async def query_root(request: RootQueryRequest):
+@app.post("/query_root", response_model=list[api_models.RootQueryResult])
+async def query_root(request: api_models.RootQueryRequest):
     datastore: DataStore = app.state.datastore
     return datastore.query_root(request.query_embedding)
     
 
 @app.post("/query_document")
-async def query_document(request: DocumentQueryRequest):
+async def query_document(request: api_models.DocumentQueryRequest):
     datastore: DataStore = app.state.datastore
     return datastore.query_documents(request.document_uuids, request.query_embedding)
 
-@app.get("/documents_info")
+@app.get("/documents_info", response_model=api_models.DocumentInfoResponse)
 async def documents_info():
     datastore: DataStore = app.state.datastore
     return datastore.get_documents_info()

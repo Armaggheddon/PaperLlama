@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 import httpx
 import aiofiles
+import ollama
 
 from ollama_proxy import OllamaProxy
 
@@ -51,6 +52,15 @@ async def generate_response():
         await asyncio.sleep(0.01)
         yield f"{very_long_text[i]}"
 
+@app.get("/has_document_uuid", response_model=datastore.HasDocumentResponse)
+async def has_document_uuid(document_uuid: str):
+    client: httpx.AsyncClient = app.state.httpx_client
+
+    has_document_response = await client.get(
+        datastore.HAS_DOCUMENT_URL,
+        params={"document_uuid": document_uuid}
+    )
+    return has_document_response.json()
 
 @app.get("/embedding_length")
 async def get_embedding_length():
@@ -179,6 +189,40 @@ async def query(request: api_models.QueryRequest):
         # media_type="application/json"
         media_type="application/x-ndjson"
     )
+
+
+@app.post("/query_document")
+async def query_document(request: api_models.QueryDocumentRequest):
+    ollama_proxy: OllamaProxy = app.state.ollama_proxy
+    client: httpx.AsyncClient = app.state.httpx_client
+
+    query_embedding = await ollama_proxy.embed(request.query_str)
+    document_query_request = datastore.DocumentQueryRequest(
+        document_uuids=[request.document_uuid],
+        query_embedding=query_embedding[0]
+    )
+    document_query_response = await client.post(
+        datastore.QUERY_DOCUMENT_URL,
+        json=document_query_request.model_dump()
+    )
+
+    if document_query_response.status_code != status.HTTP_200_OK:
+        return {"message": {"content": "No relevant documents found", "type": "error"}}
+    
+    chunk_texts = [
+        datastore.DocumentChunk(**chunk) for chunk in document_query_response.json()]
+    
+    text_chunks = [doc_info.text for doc_info in chunk_texts]
+    reranked_chunk_texts = await ollama_proxy.rerank(request.query_str, text_chunks)
+    if not reranked_chunk_texts:
+        return {"message": {"content": "No relevant documents found", "type": "error"}}
+    
+    return StreamingResponse(
+        ollama_proxy.chat(request.query_str, reranked_chunk_texts), 
+        # media_type="application/json"
+        media_type="application/x-ndjson"
+    )
+
 
 @app.delete("/delete_all")
 async def delete_all():

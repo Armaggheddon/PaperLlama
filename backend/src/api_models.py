@@ -18,3 +18,8 @@ class ChatMessage(BaseModel):
 class QueryRequest(BaseModel):
     text: str
     history: list[ChatMessage]
+
+class QueryDocumentRequest(BaseModel):
+    document_uuid: str
+    query_str: str
+    history: list[ChatMessage]
