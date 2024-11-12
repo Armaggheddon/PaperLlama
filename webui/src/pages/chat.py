@@ -1,4 +1,3 @@
-import io
 import requests
 import json
 
@@ -9,7 +8,6 @@ def stream_response(message):
     # _history = [{"role": item["role"], "content": item["content"]} for item in history]
     request = {"text": message, "history": []}
     stream = requests.post("http://backend:8000/query", json=request, stream=True)
-    running_response = io.StringIO()
     for chunk in stream.iter_lines():
         print(chunk)
         json_chunk = json.loads(chunk)
@@ -22,6 +20,8 @@ st.title("PaperLlama")
 #     st.write('''
 #         Example extra text that is displayed on dropdown menu
 #     ''')
+if st.sidebar.button("Clear chat"):
+    st.session_state.messages = []
 
 if "messages" not in st.session_state:
     st.session_state.messages = []

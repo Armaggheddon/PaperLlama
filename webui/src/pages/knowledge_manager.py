@@ -107,7 +107,7 @@ if len(st.session_state["files"]) != 0:
     )
     event = st.dataframe(
         data_df,
-        column_order=("File name", "Summary"),
+        column_order=("document_uuid", "File name", "Summary"),
         use_container_width=True,
         hide_index=True,
         on_select="rerun"
