@@ -15,13 +15,16 @@ def stream_response(message):
         yield json_chunk["message"]["content"]
 
 
+st.sidebar.markdown("## Settings")
+if st.sidebar.button("Clear chat"):
+    st.session_state.messages = []
+
+
 st.title("PaperLlama")
 # with st.expander("Details"):
 #     st.write('''
 #         Example extra text that is displayed on dropdown menu
 #     ''')
-if st.sidebar.button("Clear chat"):
-    st.session_state.messages = []
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
