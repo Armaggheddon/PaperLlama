@@ -3,17 +3,21 @@ import requests
 import pandas as pd
 import streamlit as st
 
+import api_models
+
 
 def get_available_files() -> list[dict[int, str, str]]:
-    response = requests.get("http://backend:8000/documents_info")
+    response = requests.get("http://backend:8000/document_info")
     
-    documents_info = response.json()
+    documents_info_response = api_models.backend_models.DocumentInfoResponse(
+        **response.json()
+    )
     
     formatted = {}
-    for info in documents_info["documents_info"]:
-        _uuid = info["document_uuid"]
-        _file_name = info["document_filename"]
-        _summary = info["document_summary"]
+    for info in documents_info_response.documents_info:
+        _uuid = info.document_uuid
+        _file_name = info.document_filename
+        _summary = info.document_summary
 
         formatted[_uuid] = {"file_name": _file_name, "summary": _summary}
 
