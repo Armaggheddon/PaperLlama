@@ -2,6 +2,7 @@ import asyncio
 import httpx
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException, status
 
@@ -37,7 +38,7 @@ async def health():
 @app.get("/has_document_uuid")
 async def has_document_uuid(document_uuid: str):
     datastore: DataStore = app.state.datastore
-    return {"has_document_uuid": datastore.has_document_uuid(document_uuid)}
+    return api_models.HasDocumentResponse(has_document=datastore.has_document_uuid(document_uuid))
 
 @app.get("/has_document", response_model=api_models.HasDocumentResponse)
 async def has_document(document_hash: str):
@@ -101,7 +102,7 @@ async def query_document(request: api_models.DocumentQueryRequest):
     datastore: DataStore = app.state.datastore
     return datastore.query_documents(request.document_uuids, request.query_embedding)
 
-@app.get("/documents_info", response_model=api_models.DocumentInfoResponse)
-async def documents_info():
+@app.get("/document_info", response_model=api_models.DocumentInfoResponse)
+async def documents_info(document_uuid: Optional[str] = None):
     datastore: DataStore = app.state.datastore
-    return datastore.get_documents_info()
+    return datastore.get_document_info(document_uuid)

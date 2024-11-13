@@ -1,18 +1,15 @@
 import asyncio
 from contextlib import asynccontextmanager
-from genericpath import isfile
-from http import client
 from pathlib import Path
 import hashlib
-from concurrent.futures import ThreadPoolExecutor
 import uuid
 import os
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 import httpx
 import aiofiles
-import ollama
 
 from ollama_proxy import OllamaProxy
 
@@ -54,13 +51,15 @@ async def generate_response():
 
 @app.get("/has_document_uuid", response_model=datastore.HasDocumentResponse)
 async def has_document_uuid(document_uuid: str):
+    print(f"Checking if document with uuid {document_uuid} exists")
     client: httpx.AsyncClient = app.state.httpx_client
 
     has_document_response = await client.get(
-        datastore.HAS_DOCUMENT_URL,
+        datastore.HAS_DOCUMENT_UUID_URL,
         params={"document_uuid": document_uuid}
     )
-    return has_document_response.json()
+    has_document_json = has_document_response.json()
+    return datastore.HasDocumentResponse(**has_document_json)
 
 @app.get("/embedding_length")
 async def get_embedding_length():
@@ -264,15 +263,17 @@ async def delete_document(document_uuid: str):
 
     return {"status": "ok"}
 
-@app.get("/documents_info")
-async def available_documents():
+@app.get("/document_info", response_model=datastore.DocumentInfoResponse)
+async def available_documents(document_uuid: Optional[str] = None):
     client: httpx.AsyncClient = app.state.httpx_client
 
     documents_info_response = await client.get(
-        datastore.DOCUMENTS_INFO_URL
+        datastore.DOCUMENT_INFO_URL,
+        params={"document_uuid": document_uuid} if document_uuid else None
     )
 
     if documents_info_response.status_code != status.HTTP_200_OK:
         return {"status": "error"}
     
-    return documents_info_response.json()
+    response = datastore.DocumentInfoResponse(**documents_info_response.json())
+    return response

@@ -162,3 +162,18 @@ class MetadataDB:
                 )
                 for row in cursor.fetchall()
             ]
+        
+    def get_document_info(
+            self,
+            document_uuid: str
+    ) -> list[DocumentInfo]:
+        query_str = f"SELECT uuid, document_hash, document_filename, summary FROM metadata WHERE uuid = ?"
+        with self._root_db as conn:
+            cursor = conn.execute(query_str, (document_uuid,))
+            row = cursor.fetchone()
+            return [DocumentInfo(
+                document_uuid=row[0],
+                document_hash_str=row[1],
+                document_filename=row[2],
+                document_summary=row[3]
+            )]

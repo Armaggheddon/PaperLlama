@@ -1,12 +1,11 @@
 import os
-import hashlib
-import uuid
 import shutil
+from typing import Optional
 
 from .metadata import MetadataDB
 from .index import VectorIndex
 
-from api_models import AddDocumentChunk, RootQueryResult, DocumentInfoResponse, DocumentChunk
+from api_models import AddDocumentChunk, RootQueryResult, DocumentInfoResponse, DocumentChunk, DocumentInfo
 
 
 _DATA_ROOT = "/vector_index"
@@ -148,13 +147,16 @@ class DataStore:
             
         return result
     
-    def get_documents_info(self) -> DocumentInfoResponse:
-        documents_info = self.metadata_db.get_documents_info()
-        return DocumentInfoResponse(
-            document_count=len(documents_info),
-            documents_info=documents_info
+    def get_document_info(self, document_uuid: Optional[str]) -> DocumentInfo:
+        document_info = (
+            self.metadata_db.get_document_info(document_uuid) 
+            if document_uuid 
+            else self.metadata_db.get_documents_info()
         )
-
+        return DocumentInfoResponse(
+            document_count=len(document_info),
+            documents_info=document_info
+        )
         
     def close(self):
         self.vector_index.close()

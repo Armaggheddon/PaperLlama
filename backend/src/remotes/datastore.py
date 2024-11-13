@@ -3,11 +3,11 @@ from pydantic import BaseModel
 
 DATASTORE_BASE_URL = "http://datastore:8000"
 HAS_DOCUMENT_URL = f"{DATASTORE_BASE_URL}/has_document"
-HAS_DOCUMENT_UUID = f"{DATASTORE_BASE_URL}/has_document_uuid"
+HAS_DOCUMENT_UUID_URL = f"{DATASTORE_BASE_URL}/has_document_uuid"
 ADD_DOCUMENT_URL = f"{DATASTORE_BASE_URL}/add_document"
 DELETE_ALL_DOCUMENTS_URL = f"{DATASTORE_BASE_URL}/delete_all"
 DELETE_DOCUMENT_URL = f"{DATASTORE_BASE_URL}/delete_document"
-DOCUMENTS_INFO_URL = f"{DATASTORE_BASE_URL}/documents_info"
+DOCUMENT_INFO_URL = f"{DATASTORE_BASE_URL}/document_info"
 QUERY_ROOT_URL = f"{DATASTORE_BASE_URL}/query_root"
 QUERY_DOCUMENT_URL = f"{DATASTORE_BASE_URL}/query_document"
 
