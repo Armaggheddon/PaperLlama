@@ -1,20 +1,14 @@
-import requests
-
 import pandas as pd
 import streamlit as st
 
-import api_models
+import remotes.client as client
 
 
 def get_available_files() -> list[dict[int, str, str]]:
-    response = requests.get("http://backend:8000/document_info")
-    
-    documents_info_response = api_models.backend_models.DocumentInfoResponse(
-        **response.json()
-    )
+    documents_info = client.get_available_documents()
     
     formatted = {}
-    for info in documents_info_response.documents_info:
+    for info in documents_info:
         _uuid = info.document_uuid
         _file_name = info.document_filename
         _summary = info.document_summary
@@ -24,14 +18,13 @@ def get_available_files() -> list[dict[int, str, str]]:
     return formatted
 
 def delete_all_files_request():
-    response = requests.delete("http://backend:8000/delete_all")
-    print(response.text)
+    if not client.delete_all_documents():
+        st.error("Failed to delete all documents")
 
 def batch_delete_request(uuids_to_delete: list[int]):
     for _uuid in uuids_to_delete:
-        response = requests.delete(
-            "http://backend:8000/delete_document", 
-            params={"document_uuid": _uuid})
+        if not client.delete_document(_uuid):
+            st.error(f"Failed to delete document with uuid {_uuid}")
 
 event = None
 
@@ -75,7 +68,7 @@ if "files" not in st.session_state:
     st.session_state["files"] = get_available_files()
 
 
-st.title("Manage knowledge")
+st.title("Knowledge manager")
 st.markdown(
     "This page allows you to manage the documents that the model "
     "can access for contextual information. Here, you can view a "

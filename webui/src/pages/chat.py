@@ -1,30 +1,28 @@
-import requests
-import json
-
 import streamlit as st
+
+import remotes.client as client
 
 
 def stream_response(message):
-    # _history = [{"role": item["role"], "content": item["content"]} for item in history]
-    request = {"text": message, "history": []}
-    stream = requests.post("http://backend:8000/query", json=request, stream=True)
-    for chunk in stream.iter_lines():
-        print(chunk)
-        json_chunk = json.loads(chunk)
-        # running_response.write(json_chunk["message"]["content"])
-        yield json_chunk["message"]["content"]
+    history = (
+        [] 
+        if not st.session_state.include_history 
+        else st.session_state.messages
+    )
+    
+    for chunk in client.stream_query(message, history):
+        yield chunk
 
-
+st.sidebar.markdown("## Info")
+st.sidebar.markdown("Chat with all the documents in the knowledge base.")
+st.sidebar.divider()
 st.sidebar.markdown("## Settings")
+st.session_state.include_history = st.sidebar.checkbox("Append history to query", value=True)
 if st.sidebar.button("Clear chat"):
     st.session_state.messages = []
 
 
-st.title("PaperLlama")
-# with st.expander("Details"):
-#     st.write('''
-#         Example extra text that is displayed on dropdown menu
-#     ''')
+st.title("Chat")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []

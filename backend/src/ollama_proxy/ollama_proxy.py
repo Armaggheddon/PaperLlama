@@ -81,7 +81,6 @@ class OllamaProxy:
             model=self.chat_model_name,
             messages=_query_with_context, 
             stream = True,
-            # format='json'
         )
 
         async for chunk in response:
@@ -109,10 +108,6 @@ class OllamaProxy:
             prompt=" ".join([summary["response"] for summary in chunk_summaries]),
             options={"temperature": 0.0}
         )
-
-        # print(summary.keys())
-        # print("\n------------------------------\n")
-        # print(summary["response"])
 
         return summary["response"]
     

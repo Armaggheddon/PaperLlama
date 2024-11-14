@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from typing import Optional
+
 
 class DocumentInfo(BaseModel):
     document_uuid: str
@@ -12,3 +14,7 @@ class DocumentInfoResponse(BaseModel):
 
 class HasDocumentResponse(BaseModel):
     has_document: bool
+
+class UploadFileResponse(BaseModel):
+    is_success: bool
+    message: Optional[str] = None

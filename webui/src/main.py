@@ -2,9 +2,10 @@ import streamlit as st
 
 
 st.logo(
-    image="src/paper_llama_nobg.png", 
-    icon_image="src/paper_llama_nobg.png", 
+    image="src/static_files/paper_llama_nobg.png", 
+    icon_image="src/static_files/paper_llama_nobg.png", 
     size="large")
+
 
 pages = st.navigation([
     st.Page("pages/chat.py", title="Chat", icon="🤖"),

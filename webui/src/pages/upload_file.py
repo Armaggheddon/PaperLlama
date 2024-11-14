@@ -1,18 +1,14 @@
-import io
-import requests
 import streamlit as st
+
+import remotes.client as client
 
 
 def upload_file(filename, file_bytes: bytes) -> tuple[bool, str]:
-    file = {"document": (filename, file_bytes, "application/pdf")}
-    response = requests.post("http://backend:8000/add_document", files=file,
-                             )
-    if response.status_code != 200:
-        return (False, response.content)
-    
-    response_data = response.json()
-    return (response_data["is_success"], response_data["message"])
-    
+    response = client.upload_file(
+        filename, 
+        file_bytes
+    )
+    return response.is_success, response.message
 
 st.title("Upload new file")
 
