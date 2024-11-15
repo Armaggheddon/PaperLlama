@@ -57,9 +57,10 @@ class OllamaProxy:
 
         self.instruct_model_name = utils.get_instruct_model_name()
 
-        self.qa_messages = [
-            {"role": "system", "content": prompts.QA_SYSTEM_PROMPT}
-        ]
+        self.chat_system_message = {
+            "role": "system", 
+            "content": prompts.QA_SYSTEM_PROMPT
+        }
     
     async def embed(self, text: str | list[str]) -> list[list[float]]:
         if isinstance(text, str):
@@ -71,12 +72,24 @@ class OllamaProxy:
         # print(text_embeddings.keys())
         return text_embeddings["embeddings"]
     
-    async def chat(self, user_input: str, context: list[str] = None):
-        # TODO: format message to include context
-        _query_with_context = self.qa_messages + [{
-            "role": "user",
-            "content": utils.format_query(context, user_input)
-        }]
+    async def chat(self, user_input: str, chat_history: list[str] = None, context: list[str] = None):
+        _query_with_context = [
+            self.chat_system_message,
+        ]
+        if chat_history:
+            _query_with_context += [
+                {
+                    "role": msg.role,
+                    "content": msg.content
+                }
+                for msg in chat_history
+            ]
+        _query_with_context += [
+            {
+                "role": "user",
+                "content": utils.format_query(context, user_input)
+            }
+        ]
         response = await self.client.chat(
             model=self.chat_model_name,
             messages=_query_with_context, 

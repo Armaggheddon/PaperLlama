@@ -145,9 +145,6 @@ async def query(request: api_models.QueryRequest):
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
     client: httpx.AsyncClient = app.state.httpx_client
 
-    # if datastore.get_document_count() == 0:
-    #     return {"message": {"content": "No documents in the datastore", "type": "error"}}
-
     embedded_query = await ollama_proxy.embed(request.text)
 
     documents_response = await client.post(
@@ -184,8 +181,11 @@ async def query(request: api_models.QueryRequest):
         return {"message": {"content": "No relevant documents found", "type": "error"}}
     
     return StreamingResponse(
-        ollama_proxy.chat(request.text, reranked_chunk_texts), 
-        # media_type="application/json"
+        ollama_proxy.chat(
+            user_input=request.text, 
+            chat_history=request.history,
+            context=reranked_chunk_texts
+        ),
         media_type="application/x-ndjson"
     )
 
@@ -217,7 +217,11 @@ async def query_document(request: api_models.QueryDocumentRequest):
         return {"message": {"content": "No relevant documents found", "type": "error"}}
     
     return StreamingResponse(
-        ollama_proxy.chat(request.query_str, reranked_chunk_texts), 
+        ollama_proxy.chat(
+            user_input=request.query_str, 
+            chat_history=request.history,
+            context=reranked_chunk_texts
+        ),
         # media_type="application/json"
         media_type="application/x-ndjson"
     )
