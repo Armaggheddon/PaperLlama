@@ -40,3 +40,12 @@ class DocumentInfoResponse(BaseModel):
 
 class HasDocumentResponse(BaseModel):
     has_document: bool
+
+class HealthCheckResponse(BaseModel):
+    up_time: float
+    status: str
+
+class DocumentDeleteResponse(BaseModel):
+    is_success: bool
+    document_filename: str = ""
+    error_message: str = ""

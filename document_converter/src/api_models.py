@@ -7,3 +7,7 @@ class ConvertDocumentRequest(BaseModel):
 
 class ConvertDocumentResponse(BaseModel):
     text_chunks: list[str]
+
+class HealthCheckResponse(BaseModel):
+    up_time: float
+    status: str

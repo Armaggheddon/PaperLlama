@@ -11,6 +11,8 @@ DOCUMENT_INFO_URL = f"{DATASTORE_BASE_URL}/document_info"
 QUERY_ROOT_URL = f"{DATASTORE_BASE_URL}/query_root"
 QUERY_DOCUMENT_URL = f"{DATASTORE_BASE_URL}/query_document"
 
+HEALTH_URL = f"{DATASTORE_BASE_URL}/health"
+
 class DocumentChunk(BaseModel):
     text: str
     page_number: int
@@ -51,3 +53,12 @@ class DocumentInfoResponse(BaseModel):
 
 class HasDocumentResponse(BaseModel):
     has_document: bool
+
+class HealthCheckResponse(BaseModel):
+    up_time: float
+    status: str
+
+class DocumentDeleteResponse(BaseModel):
+    is_success: bool
+    document_filename: str = ""
+    error_message: str = ""
