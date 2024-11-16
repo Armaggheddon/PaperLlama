@@ -3,6 +3,8 @@ import httpx
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
+import time
+import sys
 
 from fastapi import FastAPI, HTTPException, status
 
@@ -13,12 +15,27 @@ from storage import DataStore
 async def lifespan(app: FastAPI):
 
     embeddings_length = 0
-    _transport = httpx.AsyncHTTPTransport(retries=3)
-    async with httpx.AsyncClient(transport=_transport) as client:
-        response = await client.get("http://backend:8000/embedding_length")
-        embeddings_length = response.json()["embedding_length"]
+    curr_retry = 0
+    max_retries = 5
+    while curr_retry < max_retries:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get("http://backend:8000/embedding_length")
+                embeddings_length = response.json()["embedding_length"]
+                break # break loop, response was successful
+        except Exception as e:
+            curr_retry += 1
+            print(
+                f"[{curr_retry}] Error getting embedding length from backend"
+                f", retrying in 5s: {e}", file=sys.stderr)
+            await asyncio.sleep(5)
+    
+    if embeddings_length == 0:
+        raise RuntimeError("Could not get embedding length from backend")
 
     app.state.datastore = DataStore(embeddings_length)
+
+    app.state.startup_time = time.time()
     
     yield
 
@@ -31,9 +48,12 @@ app = FastAPI(
 )
 
 
-@app.get("/health")
+@app.get("/health", response_model=api_models.HealthCheckResponse)
 async def health():
-    return {"status": "ok"}
+    return api_models.HealthCheckResponse(
+        up_time=time.time() - app.state.startup_time,
+        status="healthy"
+    )
 
 @app.get("/has_document_uuid")
 async def has_document_uuid(document_uuid: str):
@@ -76,20 +96,27 @@ async def add_document(request: api_models.AddDocumentRequest):
                 detail=str(e)
             )
 
-@app.delete("/delete_document")
+@app.delete("/delete_document", response_model=api_models.DocumentDeleteResponse)
 async def delete_document(document_uuid: str):
     datastore: DataStore = app.state.datastore
     if not datastore.has_document_uuid(document_uuid):
-        return {"document_filename": None}
+        return api_models.DocumentDeleteResponse(
+            is_success=False, 
+            error_message="Document not found"
+        )
     document_filename = datastore.delete_document(document_uuid)
-    return {"document_filename": document_filename}
+    return api_models.DocumentDeleteResponse(
+        is_success=True, 
+        document_filename=document_filename
+    )
 
-@app.delete("/delete_all")
+@app.delete("/delete_all", response_model=api_models.DocumentDeleteResponse)
 async def delete_all():
     datastore: DataStore = app.state.datastore
     loop = asyncio.get_running_loop()
     with ThreadPoolExecutor() as pool:
         await loop.run_in_executor(pool, datastore.clear)
+    return api_models.DocumentDeleteResponse(is_success=True)
 
 @app.post("/query_root", response_model=list[api_models.RootQueryResult])
 async def query_root(request: api_models.RootQueryRequest):

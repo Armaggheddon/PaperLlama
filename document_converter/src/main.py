@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 from fastapi import FastAPI, HTTPException, status
 
@@ -13,6 +14,7 @@ import api_models
 async def lifespan(app: FastAPI):
 
     app.state.converter = DoclingDocumentConverter()
+    app.state.startup_time = time.time()
 
     yield
 
@@ -24,9 +26,12 @@ app = FastAPI(
 )
 
 
-@app.get("/")
-async def read_root():
-    return {"Hello": "World"}
+@app.get("/health", response_model=api_models.HealthCheckResponse)
+async def health():
+    return api_models.HealthCheckResponse(
+        up_time=time.time() - app.state.startup_time,
+        status="healthy"
+    )
 
 
 @app.post("/convert_document", response_model=api_models.ConvertDocumentResponse)

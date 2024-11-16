@@ -1,10 +1,10 @@
-import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 import hashlib
 import uuid
 import os
 from typing import Optional
+import time
 
 from fastapi import FastAPI, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -24,10 +24,10 @@ _UPLOADED_FILES_PATH = Path("/uploaded_files")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     
-    # app.state.ollama_embed = await OllamaEmbed.create("ollama", 11434)
     app.state.ollama_proxy = await OllamaProxy.create("ollama", 11434)
     app.state.httpx_client = httpx.AsyncClient()
-    # app.state.datastore = DataStore(app.state.ollama_proxy.embed_model_output)
+    
+    app.state.startup_time = time.time()
     yield
 
     # Stop the app
@@ -38,16 +38,60 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
 
+@app.get("/health", response_model=api_models.ServiceHealth)
+async def health():
+    return api_models.ServiceHealth(
+        up_time=time.time() - app.state.startup_time,
+        status="healthy"
+    )
 
-async def generate_response():
-    very_long_text = "In a far away galaxy, there was a planet called Ollama. On this planet, there were many creatures, but the most interesting of them all were the Ollamas. The Ollamas were a very intelligent species, and they had the ability to communicate with each other using a special language called Ollamish. The Ollamas were also very friendly and peaceful, and they lived in harmony with the other creatures on the planet. One day, a group of scientists from Earth arrived on Ollama to study the planet and its inhabitants. The scientists were amazed by the Ollamas and their unique language, and they spent many years learning about them. Eventually, the scientists were able to communicate with the Ollamas and learn from them. The Ollamas shared their knowledge of the planet and its history with the scientists, and together they made many important discoveries. The scientists were so impressed by the Ollamas that they decided to stay on the planet and continue their research. And so, the Ollamas and the scientists lived together in peace and harmony, sharing their knowledge and wisdom with each other for many years to come."
-    for i in range(len(very_long_text)):
-        await asyncio.sleep(0.01)
-        yield f"{very_long_text[i]}"
+@app.get("/services_health", response_model=api_models.HealthCheckResponse)
+async def services_health():
+    client: httpx.AsyncClient = app.state.httpx_client
+    datastore_uptime = 0
+    datastore_status_str = "unhealthy"
+    try:
+        datastore_health_response = await client.get(
+            datastore.HEALTH_URL)
+        if datastore_health_response.status_code == status.HTTP_200_OK:
+            datastore_health = datastore.HealthCheckResponse(
+                **datastore_health_response.json()
+            )
+            datastore_uptime = datastore_health.up_time
+            datastore_status_str = datastore_health.status
+    except httpx.ConnectTimeout:
+        pass
+    
+    document_converter_uptime = 0
+    document_converter_status_str = "unhealthy"
+    try:
+        document_converter_health = await client.get(
+            document_converter.HEALTH_URL)
+        if document_converter_health.status_code == status.HTTP_200_OK:
+            document_converter_health = document_converter.HealthCheckResponse(
+                **document_converter_health.json()
+            )
+            document_converter_uptime = document_converter_health.up_time
+            document_converter_status_str = document_converter_health.status
+    except httpx.ConnectTimeout:
+        pass
+    
+    return api_models.HealthCheckResponse(
+        backend=api_models.ServiceHealth(
+            up_time=time.time() - app.state.startup_time,
+            status="healthy"
+        ),
+        datastore=api_models.ServiceHealth(
+            up_time=datastore_uptime,
+            status=datastore_status_str
+        ),
+        document_converter=api_models.ServiceHealth(
+            up_time=document_converter_uptime,
+            status=document_converter_status_str
+        )
+    )
+
 
 @app.get("/has_document_uuid", response_model=datastore.HasDocumentResponse)
 async def has_document_uuid(document_uuid: str):
@@ -61,16 +105,12 @@ async def has_document_uuid(document_uuid: str):
     has_document_json = has_document_response.json()
     return datastore.HasDocumentResponse(**has_document_json)
 
+
 @app.get("/embedding_length")
 async def get_embedding_length():
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
     return {"embedding_length": ollama_proxy.embed_model_output}
 
-
-@app.get("/chat-stream")
-async def stream_response(text):
-    ollama_proxy: OllamaProxy = app.state.ollama_proxy
-    return StreamingResponse(ollama_proxy.chat(text), media_type="text/event-stream")
 
 @app.post("/add_document", response_model=api_models.UploadFileResponse)
 async def add_document(document: UploadFile):
@@ -103,12 +143,15 @@ async def add_document(document: UploadFile):
             document_name=document_name).model_dump(),
         timeout=None
     )
-    if document_parse_response.status_code != status.HTTP_200_OK:
-        # print(document_parse_response.text) 
-        return api_models.UploadFileResponse(is_success=False, message="Document parsing failed")
+    if document_parse_response.status_code != status.HTTP_200_OK: 
+        return api_models.UploadFileResponse(
+            is_success=False, 
+            message="Document parsing failed"
+        )
     
     document_parse_response_json = document_parse_response.json()
-    text_chunks = document_converter.ConvertDocumentResponse(**document_parse_response_json).text_chunks
+    text_chunks = document_converter.ConvertDocumentResponse(
+        **document_parse_response_json).text_chunks
     
     embeddings = await ollama_proxy.embed(text_chunks)
     document_summary = await ollama_proxy.summarize(text_chunks)
@@ -139,6 +182,7 @@ async def add_document(document: UploadFile):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Datastore failed to add document")
     
     return api_models.UploadFileResponse(is_success=True)
+
 
 @app.post("/query")
 async def query(request: api_models.QueryRequest):
@@ -189,7 +233,6 @@ async def query(request: api_models.QueryRequest):
         media_type="application/x-ndjson"
     )
 
-
 @app.post("/query_document")
 async def query_document(request: api_models.QueryDocumentRequest):
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
@@ -222,12 +265,11 @@ async def query_document(request: api_models.QueryDocumentRequest):
             chat_history=request.history,
             context=reranked_chunk_texts
         ),
-        # media_type="application/json"
         media_type="application/x-ndjson"
     )
 
 
-@app.delete("/delete_all")
+@app.delete("/delete_all", response_model=api_models.DeleteDocumentResponse)
 async def delete_all():
     
     client: httpx.AsyncClient = app.state.httpx_client
@@ -240,11 +282,14 @@ async def delete_all():
         os.remove(os.path.join(str(_UPLOADED_FILES_PATH), file))
 
     if delete_all_response.status_code != status.HTTP_200_OK:
-        return {"status": "error"}
+        return api_models.DeleteDocumentResponse(
+            is_success=False, 
+            error_message="Datastore failed to delete all documents"
+        )
 
-    return {"status": "ok"}
+    return api_models.DeleteDocumentResponse(is_success=True)
 
-@app.delete("/delete_document")
+@app.delete("/delete_document", response_model=api_models.DeleteDocumentResponse)
 async def delete_document(document_uuid: str):
     
     client: httpx.AsyncClient = app.state.httpx_client
@@ -255,17 +300,34 @@ async def delete_document(document_uuid: str):
     )
 
     if delete_document_response.status_code != status.HTTP_200_OK:
-        return {"status": "error"}
+        return api_models.DeleteDocumentResponse(
+            is_success=False, 
+            error_message="Datastore failed to delete document"
+        )
     
-    document_filename = delete_document_response.json()["document_filename"]
+    delete_document = datastore.DocumentDeleteResponse(
+        **delete_document_response.json()
+    )
+
+    if not delete_document.is_success:
+        return api_models.DeleteDocumentResponse(
+            is_success=False, 
+            error_message=delete_document.error_message
+        )
+
+    document_filename = delete_document.document_filename
     if not document_filename:
-        return {"status": "File does not exist in the datastore"}
+        return api_models.DeleteDocumentResponse(
+            is_success=False, 
+            error_message="Document not found"
+        )
     
     _document_path = os.path.join(str(_UPLOADED_FILES_PATH), document_filename)
     if os.path.isfile(_document_path):
         os.remove(_document_path)
 
-    return {"status": "ok"}
+    return api_models.DeleteDocumentResponse(is_success=True)
+
 
 @app.get("/document_info", response_model=datastore.DocumentInfoResponse)
 async def available_documents(document_uuid: Optional[str] = None):
