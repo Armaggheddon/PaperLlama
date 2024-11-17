@@ -8,3 +8,5 @@ DELETE_DOCUMENT_URL = f"{_BASE_URL}/delete_document"
 ADD_DOCUMENT_URL = f"{_BASE_URL}/add_document"
 
 QUERY_URL = f"{_BASE_URL}/query"
+
+SERVICES_HEALTH_URL = f"{_BASE_URL}/services_health"

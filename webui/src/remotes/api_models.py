@@ -18,3 +18,16 @@ class HasDocumentResponse(BaseModel):
 class UploadFileResponse(BaseModel):
     is_success: bool
     message: Optional[str] = None
+
+class DeleteDocumentResponse(BaseModel):
+    is_success: bool
+    error_message: str = ""
+
+class ServiceHealth(BaseModel):
+    up_time: float
+    status: str
+
+class HealthCheckResponse(BaseModel):
+    backend: ServiceHealth
+    datastore: ServiceHealth
+    document_converter: ServiceHealth
