@@ -13,8 +13,11 @@ def upload_file(filename, file_bytes: bytes) -> api_models.UploadFileResponse:
         files=file,
     )
 
-    if response.status_code != 200:
-        return False, response.content
+    if not response or response.status_code != 200:
+        return api_models.UploadFileResponse(
+            is_success=False,
+            message=response.content
+        )
     
     upload_file_response = api_models.UploadFileResponse(
         **response.json()
@@ -103,14 +106,54 @@ def stream_document_query(
         json_chunk = json.loads(chunk)
         yield json_chunk["message"]["content"]
 
-def delete_all_documents() -> bool:
+def delete_all_documents() -> api_models.DeleteDocumentResponse:
     response = requests.delete(endpoints.DELETE_ALL_URL)
-    return response.status_code == 200
+    if not response or response.status_code != 200:
+        return api_models.DeleteDocumentResponse(
+            is_success=False,
+            error_message=response.content
+        )
+    
+    delete_document_response = api_models.DeleteDocumentResponse(
+        **response.json()
+    )
+    return delete_document_response
 
 
-def delete_document(document_uuid: int) -> bool:
+def delete_document(document_uuid: int) -> api_models.DeleteDocumentResponse:
     response = requests.delete(
         endpoints.DELETE_DOCUMENT_URL, 
         params={"document_uuid": document_uuid})
-    return response.status_code == 200
+    if not response or response.status_code != 200:
+        return api_models.DeleteDocumentResponse(
+            is_success=False,
+            error_message=response.content
+        )
+    delete_document_response = api_models.DeleteDocumentResponse(
+        **response.json()
+    )
+    return delete_document_response
+ 
 
+def services_health() -> api_models.HealthCheckResponse:
+    response = requests.get(endpoints.SERVICES_HEALTH_URL)
+    if not response or response.status_code != 200:
+        return api_models.HealthCheckResponse(
+            backend=api_models.ServiceHealth(
+                up_time=0, 
+                status="unhealthy"
+            ),
+            datastore=api_models.ServiceHealth(
+                up_time=0, 
+                status="unhealthy"
+            ),
+            document_converter=api_models.ServiceHealth(
+                up_time=0, 
+                status="unhealthy"
+            )
+        )
+    
+    health_check_response = api_models.HealthCheckResponse(
+        **response.json()
+    )
+    return health_check_response
