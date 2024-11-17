@@ -35,7 +35,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    lifespan=lifespan
+    lifespan=lifespan,
+    title="Backend API",
 )
 
 
@@ -116,7 +117,10 @@ async def get_embedding_length():
 async def add_document(document: UploadFile):
     document_bytes = await document.read()
     if not document.filename.endswith(".pdf"):
-        return api_models.UploadFileResponse(is_success=False, message="Only PDF files are supported")
+        return api_models.UploadFileResponse(
+            is_success=False, 
+            message="Only PDF files are supported"
+    )   
     
     print(f"Received document: {document.filename} of size {len(document_bytes)}")
     ollama_proxy: OllamaProxy = app.state.ollama_proxy
@@ -130,9 +134,25 @@ async def add_document(document: UploadFile):
         datastore.HAS_DOCUMENT_URL,
         params={"document_hash": document_hash}
     )
-    if has_document_response.json()["has_document"]:
-        return api_models.UploadFileResponse(is_success=False, message="Document already exists in the datastore")
+    if(
+        not has_document_response 
+        or has_document_response.status_code != status.HTTP_200_OK
+    ):
+        return api_models.UploadFileResponse(
+            is_success=False, 
+            message="Datastore failed to check if document exists"
+        )
     
+    has_document = datastore.HasDocumentResponse(
+        **has_document_response.json()
+    )
+
+    if has_document.has_document:
+        return api_models.UploadFileResponse(
+            is_success=False, 
+            message="Document already exists"
+        )
+
     document_uuid = str(uuid.uuid4())
     async with aiofiles.open(str(_UPLOADED_FILES_PATH / document_name), "wb") as f:
         await f.write(document_bytes)
@@ -179,7 +199,7 @@ async def add_document(document: UploadFile):
         timeout=None
     )
     if datastore_response.status_code != status.HTTP_200_OK:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Datastore failed to add document")
+        return api_models.UploadFileResponse(is_success=False, message="Datastore failed to add document")
     
     return api_models.UploadFileResponse(is_success=True)
 
@@ -277,15 +297,14 @@ async def delete_all():
     delete_all_response = await client.delete(
         datastore.DELETE_ALL_DOCUMENTS_URL
     )
-    
-    for file in os.listdir(str(_UPLOADED_FILES_PATH)):
-        os.remove(os.path.join(str(_UPLOADED_FILES_PATH), file))
-
-    if delete_all_response.status_code != status.HTTP_200_OK:
+    if not delete_all_response or delete_all_response.status_code != status.HTTP_200_OK:
         return api_models.DeleteDocumentResponse(
             is_success=False, 
             error_message="Datastore failed to delete all documents"
         )
+    
+    for file in os.listdir(str(_UPLOADED_FILES_PATH)):
+        os.remove(os.path.join(str(_UPLOADED_FILES_PATH), file))
 
     return api_models.DeleteDocumentResponse(is_success=True)
 
@@ -299,7 +318,10 @@ async def delete_document(document_uuid: str):
         params={"document_uuid": document_uuid}
     )
 
-    if delete_document_response.status_code != status.HTTP_200_OK:
+    if (
+        not delete_document_response 
+        or delete_document_response.status_code != status.HTTP_200_OK
+    ):
         return api_models.DeleteDocumentResponse(
             is_success=False, 
             error_message="Datastore failed to delete document"
