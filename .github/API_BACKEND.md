@@ -146,7 +146,32 @@ Run a query against a specific document. Enables document-specific queries using
     }
     ```
     role is one of "user" or "assistant"
-- **Response**: same as [**`/query`**](#post-query)
+
+- **Response**: it is a streamed response straight from Ollama. The text produced by the LLM can be obtained by the following:
+    ```python
+    _json = {"text": user_query, "history": {"role": "assistant", "content": "How can I help you?"}}
+    stream_response = requests.post("http://localhost:8000/query", json=_json, stream=True)
+    for chunk in stream_response.iter_lines():
+        json_chunk = json.loads(chunk)
+        text_response = json_chunk["message"]["content"]
+    ```
+    Each json is sent with a new line character, `\n` and contains the following:
+    ```json
+    {
+        "model": "llama3.2",
+        "created_at": "2023-08-04T08:52:19.385406455-07:00",
+        "message": {
+            "role": "assistant",
+            "content": "The",
+            "images": null
+        },
+        "done": false
+    }
+    ```
+    as the Ollama implementation ([link](https://github.com/ollama/ollama/blob/main/docs/api.md#response-9)).
+
+> [!TIP]
+> See the code snippet in [**client.py**](../webui/src/remotes/client.py) for processing streamed responses.
 
 
 ## [DELETE] /delete_all
@@ -169,7 +194,15 @@ Remove a specific document by its UUID.
     /delete_document?=document_uuid=xxx
     ```
 
-- **Response**: same format as [**`/delete_all`**](#delete-delete_all)
+- **Response**:
+    ```json
+    {
+        "is_success": true,
+        "error_message": ""
+    }
+    ```
+    - `is_success`: Confirms if the operation succeeded.
+    - `error_message`: Provides details if something goes wrong.
 
 
 ## [GET] /document_info
