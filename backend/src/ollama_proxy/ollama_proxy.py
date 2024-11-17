@@ -1,6 +1,6 @@
 import json
 import asyncio
-from click import option
+from itertools import batched
 from ollama import AsyncClient
 
 from . import utils
@@ -37,11 +37,14 @@ class OllamaProxy:
         _client = AsyncClient(f"http://{host}:{port}")
         embed_model_name = utils.get_embedding_model_name()
         chat_model_name = utils.get_chat_model_name()
+        instruct_model_name = utils.get_instruct_model_name()
         available_models = await _client.list()
         if embed_model_name not in available_models:
             await _client.pull(embed_model_name)
         if chat_model_name not in available_models:
             await _client.pull(chat_model_name)
+        if instruct_model_name not in available_models:
+            await _client.pull(instruct_model_name)
         
         return OllamaProxy(_client)
 
@@ -99,21 +102,18 @@ class OllamaProxy:
         async for chunk in response:
             yield json.dumps(chunk) + '\n'
 
-    async def summarize(self, text: list[str]) -> str:
-        _summary_task = [
-            {"role": "system", "content": prompts.SUMMARIZE_SYSTEM_PROMPT},
-            {"role": "user", "content": utils.format_summary_prompt(text)}
-        ]
-
-        chunk_summaries = await asyncio.gather(*[
-            self.client.generate(
-                model=self.instruct_model_name,
-                system=prompts.SUMMARIZE_SYSTEM_PROMPT,
-                prompt=chunk,
-                options={"temperature": 0.0}
-            )
-            for chunk in text
-        ])
+    async def summarize(self, text: list[str], parallel_req_count: int=4) -> str:
+        chunk_summaries = []
+        for batch in batched(text, parallel_req_count):
+            chunk_summaries += await asyncio.gather(*[
+                self.client.generate(
+                    model=self.instruct_model_name,
+                    system=prompts.SUMMARIZE_SYSTEM_PROMPT,
+                    prompt=chunk,
+                    options={"temperature": 0.0}
+                )
+                for chunk in batch
+            ])
 
         summary = await self.client.generate(
             model=self.instruct_model_name,
