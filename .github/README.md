@@ -59,7 +59,7 @@ With **Docker Compose**, you can spin up the whole PaperLlama suite in one go! H
 > [!NOTE]
 > GPU support requires the NVIDIA Container Toolkit. Look [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for the installation guide.
 
-> [!INFO]
+> [!IMPORTANT]
 > The first startup, as well as the first file upload, might take a while since the required models are downloaded. This is a one time operation. 
 
 
