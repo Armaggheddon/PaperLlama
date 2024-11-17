@@ -1,6 +1,18 @@
 # Datastore APIs
 Welcome to the Datastore API documentation! These endpoints help you interact with your datastore, from managing documents to running advanced queries. This service uses Faiss for the text embeddings and sqlite3 for the metadata associated to the embedding. It is organized as a hierarchical index with a root index and many sub indexes for each document. Let's explore the APIs! 🌟
 
+| Method | Path | Purpose |
+| :-- | :-- | :-- |
+| **GET** | [`/health`](#get-health) | Ensures the datastore is up and running. Perfect for monitoring tools or health checks. |
+| **GET** | [`/has_document_uuid`](#get-has_document_uuid) | Checks if a document with the specified UUID has been uploaded. |
+| **GET** | [`/has_document`](#get-has_document) | Verifies the existence of a document based on its hash value. |
+| **POST** | [`/add_document`](#post-add_document) |  Add a document and its associated data, preparing it for querying. |
+| **DELETE** | [`/delete_document`](#delete-delete_document) | Delete a single document while keeping the rest intact. |
+| **DELETE** | [`/delete_all`](#delete-delete_all) | Clear everything for a fresh start. |
+| **POST** | [`/query_root`](#post-query_root) | Identify documents most likely to be relevant to your query. |
+| **POST** | [`/query_document`](#post-query_document) | Retrieve the most relevant text chunks from specific documents. |
+| **GET** | [`/document_info`](#get-document_info) | Retrieve details about all documents or target one using its UUID. |
+
 
 ## [GET] /health
 Check the health of the datastore service.

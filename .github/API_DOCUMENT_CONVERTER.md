@@ -1,7 +1,13 @@
 # Document converter APIs
 Welcome to the Document Converter API! This service specializes in converting documents into digestible text chunks, making them ready for further processing. This service makes use of the Docling library; check it out [**here**](https://github.com/DS4SD/docling). Let’s dive in the APIs! 🌟
 
-## [GET] /healthCheck the health of the document converter service.
+| Method | Path | Purpose |
+| :-- | :-- | :-- |
+| **GET** | [`/health`](#get-health) | Ensure the document converter is operational and ready for action. |
+| **POST** | [`/convert_document`](#post-convert_document) | Process a document from the shared volume and split it into chunks of a specified size for easy handling. |
+
+
+## [GET] /health
 Check the health of the document converter service.
 - **Response**:
     ```json
