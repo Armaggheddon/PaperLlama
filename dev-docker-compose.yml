@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile_datastore
     container_name: datastore
     ports:
-      - "8100:8000"
+      - "8102:8000"
     volumes:
       - $PWD/datastore:/dev_datastore
       - database_data:/vector_index
@@ -35,6 +35,8 @@ services:
       context: document_converter
       dockerfile: Dockerfile_documentconverter
     container_name: document_converter
+    ports:
+      - "8101:8000"
     volumes:
       - $PWD/document_converter:/dev_document_converter
       - document_converter_data:/converter_cache
@@ -57,7 +59,7 @@ services:
       dockerfile: Dockerfile_backend
     container_name: backend
     ports:
-      - "8080:8000"
+      - "8100:8000"
     volumes:
       - $PWD/backend:/dev_backend
       - database_data:/vector_index
@@ -85,10 +87,10 @@ services:
       - "80:8501"
     depends_on:
       - backend
-    stdin_open: true
-    tty: true
-    command: 
-      - /bin/bash
+    # stdin_open: true
+    # tty: true
+    # command: 
+    #   - /bin/bash
 
 
 

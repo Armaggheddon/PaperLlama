@@ -52,7 +52,6 @@ services:
       - "80:8501"
     depends_on:
       - backend
-      - ollama
 
 
 volumes:
