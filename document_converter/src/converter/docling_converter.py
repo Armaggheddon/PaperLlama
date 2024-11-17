@@ -19,14 +19,17 @@ _UPLOADED_FILES_PATH = Path("/uploaded_files")
 
 class DoclingDocumentConverter:
 
-    def __init__(self):
+    @staticmethod
+    async def create():
         artifacts_path = StandardPdfPipeline.download_models_hf("/converter_cache")
         pipeline_options = PdfPipelineOptions(artifacts_path=artifacts_path)
         pipeline_options.images_scale = 2.0
         pipeline_options.generate_page_images = True
         pipeline_options.generate_table_images = True
         pipeline_options.generate_picture_images = True
+        return DoclingDocumentConverter(pipeline_options)
 
+    def __init__(self, pipeline_options: PdfPipelineOptions):
         self.converter = DocumentConverter(format_options={
             InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
         })
@@ -59,11 +62,6 @@ class DoclingDocumentConverter:
                 "".join(chunk) for chunk in chunks
             ]
         )
-        # chunks = list(
-        #     HierarchicalChunker().chunk(document)
-        # )
-
-        # self.convert_to_markup(file_name, file_bytes)
 
         return result
     
