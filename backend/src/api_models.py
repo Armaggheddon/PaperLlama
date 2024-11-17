@@ -29,11 +29,6 @@ class DeleteDocumentResponse(BaseModel):
     error_message: str = ""
 
 
-class ReadyCheckResponse(BaseModel):
-    backend: bool
-    datastore: bool
-    document_converter: bool
-
 class ServiceHealth(BaseModel):
     up_time: float
     status: str

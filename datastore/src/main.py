@@ -124,7 +124,7 @@ async def query_root(request: api_models.RootQueryRequest):
     return datastore.query_root(request.query_embedding)
     
 
-@app.post("/query_document")
+@app.post("/query_document", response_model=list[api_models.DocumentChunk])
 async def query_document(request: api_models.DocumentQueryRequest):
     datastore: DataStore = app.state.datastore
     return datastore.query_documents(request.document_uuids, request.query_embedding)

@@ -13,7 +13,7 @@ import api_models
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    app.state.converter = DoclingDocumentConverter()
+    app.state.converter = await DoclingDocumentConverter.create()
     app.state.startup_time = time.time()
 
     yield
@@ -22,7 +22,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    lifespan=lifespan
+    lifespan=lifespan,
+    title="Document Converter API",
 )
 
 
