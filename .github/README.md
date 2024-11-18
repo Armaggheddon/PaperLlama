@@ -110,34 +110,89 @@ environment:
     - INSTRUCT_MODEL_NAME=llama3.2:1b-instruct-q4_0
 ```
 
-You can use any model that Ollama supports, assuming it can run on your hardware 🫣. Look [**here**](https://ollama.com/search) for a complete list of supported models.
+You can use any model that is supported by Ollama, assuming it can run on your hardware 🫣. Look [**here**](https://ollama.com/search) for a complete list of supported models.
+
+The prompts used for the different tasks are not the greatest, I will give that. So feel free to change the prompts used in [`prompts.py`](../backend/src/ollama_proxy/prompts.py) to better match the model you choose to use. Remember to rerun [`Step 2 of Getting started`](#-getting-started) if the prompts are changed while the services are running.
+
+> [!NOTE]
+> Using Llama 3.2 1B, while being lightweight to run, will not yield the best results. Try with a larger model since it generally has better understanding capabilities and adherence to the prompts.
 
 > [!WARNING]
-> When you change the text embedding model and there are already embedded documents, if the embedding size is different, this will crash the application. Delete the currently stored documents and restart.
+> When you change the text embedding model and there are already embedded documents, if the embedding size is different, querying or adding new documents will crash the application. Delete the currently stored documents and restart.
 
-Additionally, free to change the prompts used in [prompts.py](../backend/src/ollama_proxy/prompts.py) to better match the model you choose to use.
 
 ## 🧐 How it works?
-PaperLlama is designed to provide a seamless experience for managing and querying documents. At a high level, the project consists of several services that work together to handle different aspects of the application. Each service exposes their functionality through a FastAPI web server so that you can easily swap components for the ones you prefer. Don't like the **datastore** and prefer ChromaDB? Simply change the **datastore** service implementing the same API interface as **datastore** and you are all ready to go!. 
+PaperLlama is a project born from a desire to experiment with LLMs and RAG systems. The goal was to create a straightforward implementation that balances simplicity with flexibility, allowing users to easily understand the system while also enabling them to swap components of customize the pipeline to fit their needs.
 
+At its core, PaperLlama provides a seamless experience for managing and querying documents by organizing its functionality into modular services. Each service exposes its functionality through a FastAPI web server, making it easy to replace or extend components as long as they adhere to the same API interface.
+
+The **datastore** is built using Faiss and SQLite, and I considered it as a personal excercise. If you prefer other vector indexes, which might also provide more functionalities you can simply replace it! There are many open source alternatives, for example you prefer ChromaDB? No problem! Replace the **datastore** service with one that implements the same API interface, and you're good to go.
 
 Here’s a brief overview of how the project works and the main services involved:
 
-- **web_ui**: handles the web interface.
+- **web_ui**: handles the user-facing web interface, providing a way to interact with the system.
 
-- **backend**: this is the main service that orchestrates the interaction between different services, effectively acting as a proxy for **datastore** and **document_converter**.
+- **backend**: the main service that orchestrates the interaction between different services, effectively acting as a proxy for **datastore** and **document_converter**.
 
-- **datastore**: this service is responsible for storing and managing all the data used by PaperLlama.
+- **datastore**: manages data storage and retrieval, including document metadata and vector embeddings.
 
-- **document_converter**: handles the document conversion from PDF format to markdown so that it easily understood by the AI model used.
+- **document_converter**: converts PDF documents into a markdown format that can be easily processed by the AI model.
 
-This compartimentation of the different services allows for easy swapping and customization of its core components. Just make sure the API interface is the same!
+This modular approach ensures flexibility, enabling experimentation with different LLMs, storage systems, or workflows. By keeping the design minimal yet extensible, PaperLlama is an ideal playground for anyone curious about building RAG pipelines or exploring document-based AI applications.
 
-API specifics can be found here:
+For details on API specifications, refer to:
 - [**backend**](API_BACKEND.md)
 - [**datastore**](API_DATASTORE.md)
 - [**document_converter**](API_DOCUMENT_CONVERTER.md)
 
+
+## 🛠️ Development
+If you’re working on PaperLlama and want to focus on developing or debugging a specific service, you can enable individual services by modifying the provided [`dev-docker-compose.yml`](../dev-docker-compose.yml) file. Here’s how you can adjust the Compose file for development purposes:
+
+1. For each service you want to to work with uncomment the following lines 
+    ```yaml
+      stdin_open: true
+      tty: true
+      command:
+        - /bin/bash
+    ```
+
+1. Launch the containers:
+    ```bash
+    docker compose -f dev-docker-compose.yml up
+    ```
+
+1. Connect to the container/s that you want to develop with. A development folder will be mounted at `/dev_<service_name>` where `<service_name>` is the name of the service you are currently connected to; for example for the datastore will be `/dev_datastore`. All the changes made to the contents of this folder will be reflected on the host `/<service_name>` folder.
+
+1. Once you finished simply terminate the containers with either `ctrl+c` or:
+    ```bash
+    docker compose -f dev-docker-compose down
+    ```
+    add option `-v` to also clear the volumes. This will also cause the services to redownload all the models on the next startup.
+
+1. Chose between `gpu-docker-compose.yml` or `docker-compose.yml` and run:
+    ```bash
+    docker compose -f <compose_file> build
+    docker compose -f <compose_file> up -d
+    ```
+
+> [!WARNING]
+> The `dev-docker-compose.yml` assumes that the host has an Nvidia GPU. If this is not the case, simply remove the following lines from the services `ollama` and `document_converter`:
+>```yaml
+>    deploy:
+>    resources:
+>        reservations:
+>        devices:
+>            -driver: nvidia
+>            count: 1
+>            capabilities: [gpu]
+>```
+
+> [!NOTE]
+> When using `dev-docker-compose.yml` all the services will expose the OpenAPI documentation on the following ports:
+>- backend: `http://localhost:8100/docs`
+>- datastore: `http://localhost:8102/docs`
+>- document_converter: `http://localhost:8101/docs`
 
 ## 📮 Responsible Disclosure
  We assume no responsibility for an improper use of this code and everything related to it. We do not assume any responsibility for damage caused to people and / or objects in the use of the code.
@@ -171,7 +226,7 @@ in the Software without restriction, including...*
 ## 📚 Libraries used
 This project makes use of the following third party libraries:
 - [**Ollama**](https://ollama.com/): for the LLM inference.
-- [**FastAPI**](https://fastapi.tiangolo.com/): for the webserver of each of the service.
+- [**FastAPI**](https://fastapi.tiangolo.com/): for the webserver of each service.
 - [**Faiss**](https://github.com/facebookresearch/faiss): for the vector database.
 - [**Docling**](https://github.com/DS4SD/docling): for processing the PDF files in such a way that is easily understandable by AI models.
 - [**Streamlit**](https://streamlit.io/): for the web ui.
