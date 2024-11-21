@@ -11,12 +11,16 @@ from fastapi import FastAPI, HTTPException, status
 import api_models
 from storage import DataStore
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
     embeddings_length = 0
     curr_retry = 0
     max_retries = 5
+    # Initializing the datastore requires to know the embedding length
+    # which is retrieved from the backend
+    # If retrieval fails just crash the app
     while curr_retry < max_retries:
         try:
             async with httpx.AsyncClient() as client:
@@ -47,9 +51,11 @@ app = FastAPI(
     title="Datastore API",
 )
 
-
 @app.get("/health", response_model=api_models.HealthCheckResponse)
 async def health():
+    """
+    Health check endpoint that returns the status of the service.
+    """
     return api_models.HealthCheckResponse(
         up_time=time.time() - app.state.startup_time,
         status="healthy"
@@ -57,21 +63,33 @@ async def health():
 
 @app.get("/has_document_uuid")
 async def has_document_uuid(document_uuid: str):
+    """
+    Checks if a document with the given UUID exists in the datastore.
+    """
     datastore: DataStore = app.state.datastore
     return api_models.HasDocumentResponse(has_document=datastore.has_document_uuid(document_uuid))
 
 @app.get("/has_document", response_model=api_models.HasDocumentResponse)
 async def has_document(document_hash: str):
+    """
+    Checks if a document with the given hash exists in the datastore.
+    """
     datastore: DataStore = app.state.datastore
     return api_models.HasDocumentResponse(has_document=datastore.has_document(document_hash))
 
 @app.get("/has_document_uuid", response_model=api_models.HasDocumentResponse)
 async def has_document_uuid(document_uuid: str):
+    """
+    Checks if a document with the given UUID exists in the datastore.
+    """
     datastore: DataStore = app.state.datastore
     return api_models.HasDocumentResponse(has_document=datastore.has_document_uuid(document_uuid))
 
 @app.post("/add_document")
 async def add_document(request: api_models.AddDocumentRequest):
+    """
+    Adds a document to the datastore.
+    """
     datastore: DataStore = app.state.datastore
     
     loop = asyncio.get_running_loop()
@@ -98,6 +116,9 @@ async def add_document(request: api_models.AddDocumentRequest):
 
 @app.delete("/delete_document", response_model=api_models.DocumentDeleteResponse)
 async def delete_document(document_uuid: str):
+    """
+    Deletes a document from the datastore.
+    """
     datastore: DataStore = app.state.datastore
     if not datastore.has_document_uuid(document_uuid):
         return api_models.DocumentDeleteResponse(
@@ -112,6 +133,9 @@ async def delete_document(document_uuid: str):
 
 @app.delete("/delete_all", response_model=api_models.DocumentDeleteResponse)
 async def delete_all():
+    """
+    Deletes all documents from the datastore.
+    """
     datastore: DataStore = app.state.datastore
     loop = asyncio.get_running_loop()
     with ThreadPoolExecutor() as pool:
@@ -120,16 +144,48 @@ async def delete_all():
 
 @app.post("/query_root", response_model=list[api_models.RootQueryResult])
 async def query_root(request: api_models.RootQueryRequest):
+    """
+    Queries the root index with the given embedding.
+    """
     datastore: DataStore = app.state.datastore
-    return datastore.query_root(request.query_embedding)
+
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        return await loop.run_in_executor(
+            pool,
+            datastore.query_root,
+            request.query_embedding
+        )
     
 
 @app.post("/query_document", response_model=list[api_models.DocumentChunk])
 async def query_document(request: api_models.DocumentQueryRequest):
+    """
+    Queries the datastore with the given document UUIDs and embedding.
+    """
     datastore: DataStore = app.state.datastore
-    return datastore.query_documents(request.document_uuids, request.query_embedding)
+
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        return await loop.run_in_executor(
+            pool,
+            datastore.query_documents,
+            request.document_uuids,
+            request.query_embedding
+        )
 
 @app.get("/document_info", response_model=api_models.DocumentInfoResponse)
 async def documents_info(document_uuid: Optional[str] = None):
+    """
+    Gets the metadata for the document with the given UUID. If no UUID is
+    provided, gets the metadata for all documents in the datastore.
+    """
     datastore: DataStore = app.state.datastore
-    return datastore.get_document_info(document_uuid)
+    
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as pool:
+        return await loop.run_in_executor(
+            pool, 
+            datastore.get_document_info,
+            document_uuid   
+        )
