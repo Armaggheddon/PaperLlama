@@ -1,3 +1,16 @@
+"""
+Contains the client functions to interact with the backend services. 
+Abstracting the error handling and response parsing from the user.
+
+The client functions are:
+    - upload_file
+    - stream_query
+    - get_available_documents
+    - has_document_uuid
+    - document_info
+    - stream_document_query
+"""
+
 import requests
 from typing import Iterable
 import json

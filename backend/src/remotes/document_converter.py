@@ -1,3 +1,7 @@
+"""
+Objects for interacting with the document_converter service.
+"""
+
 from pydantic import BaseModel
 
 DOCUMENT_CONVERTER_BASE_URL = "http://document_converter:8000"

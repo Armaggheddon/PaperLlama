@@ -18,15 +18,26 @@ _UPLOADED_FILES_PATH = Path("/uploaded_files")
 
 
 class DoclingDocumentConverter:
-
+    """
+    Represents a document converter that converts a document to markdown format.
+    The document converter uses the Docling pipeline to convert the document.
+    """
     @staticmethod
     async def create():
+        """
+        Creates an instance of the DoclingDocumentConverter class by downloading
+        the models from the server and initializing the pipeline options. The
+        instance is returned.
+        The first time this method is called, the models are downloaded from the
+        server, which might take a while. Subsequent calls will use the cached
+        models.
+        """
         artifacts_path = StandardPdfPipeline.download_models_hf("/converter_cache")
         pipeline_options = PdfPipelineOptions(artifacts_path=artifacts_path)
-        pipeline_options.images_scale = 2.0
-        pipeline_options.generate_page_images = True
-        pipeline_options.generate_table_images = True
-        pipeline_options.generate_picture_images = True
+        # pipeline_options.images_scale = 2.0
+        # pipeline_options.generate_page_images = True
+        # pipeline_options.generate_table_images = True
+        # pipeline_options.generate_picture_images = True
         return DoclingDocumentConverter(pipeline_options)
 
     def __init__(self, pipeline_options: PdfPipelineOptions):
@@ -42,7 +53,18 @@ class DoclingDocumentConverter:
         document_name: str, 
         chunk_size: int = 800
     ) -> ConvertDocumentResponse:
+        """
+        Converts a document to a markdown format. The document is read from the
+        uploaded files directory. The document is converted in chunks of the
+        specified size. The result is returned as a list of text chunks.
         
+        Args:
+        - document_name (str): The name of the document to convert.
+        - chunk_size (int): The size of the chunks to convert the document in.
+        
+        Returns:
+        - ConvertDocumentResponse: The result of the conversion.
+        """
         document_path = _UPLOADED_FILES_PATH / document_name
         print(document_path)
         if not document_path.exists():
@@ -66,7 +88,16 @@ class DoclingDocumentConverter:
         return result
     
     def convert_to_markup(self, file_name, file_bytes):
+        """
+        Converts a document to markdown format and saves the images of the pages,
+        figures, and tables. The images are saved in the scratch directory.
+        Not used, but kept for reference.
         
+        Args:
+        - file_name (str): The name of the document file.
+        - file_bytes (bytes): The bytes of the document file.
+        """
+
         document_stream = DocumentStream(
             name=file_name, 
             stream=io.BytesIO(file_bytes)

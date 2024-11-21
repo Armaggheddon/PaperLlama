@@ -1,3 +1,6 @@
+# Description: This file contains the prompt templates for the different tasks.
+# The prompts are used to instruct the instruct model on how to perform.
+# Feel free to modify the prompts to suit your needs.
 
 SUMMARIZE_SYSTEM_PROMPT = (
     "You are tasked with generating a concise summary of the provided "

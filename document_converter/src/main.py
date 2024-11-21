@@ -6,7 +6,6 @@ import time
 from fastapi import FastAPI, HTTPException, status
 
 from converter import DoclingDocumentConverter
-
 import api_models
 
 
@@ -18,17 +17,17 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # close, or wait termination?
-
 
 app = FastAPI(
     lifespan=lifespan,
     title="Document Converter API",
 )
 
-
 @app.get("/health", response_model=api_models.HealthCheckResponse)
 async def health():
+    """
+    Health check endpoint that returns the status of the service.
+    """
     return api_models.HealthCheckResponse(
         up_time=time.time() - app.state.startup_time,
         status="healthy"
@@ -37,7 +36,9 @@ async def health():
 
 @app.post("/convert_document", response_model=api_models.ConvertDocumentResponse)
 async def convert_document(request: api_models.ConvertDocumentRequest):
-    
+    """
+    Converts a document to a markdown format.
+    """
     document_converter: DoclingDocumentConverter = app.state.converter
     loop = asyncio.get_running_loop()
     with ThreadPoolExecutor() as pool:
